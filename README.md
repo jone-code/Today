@@ -90,13 +90,33 @@ AI 自动整理、总结、建立长期记忆，并在未来主动关联。随�
 
 ---
 
+## 架构与模块
+
+完整模块划分与前后端选型见：**[docs/architecture.md](./docs/architecture.md)**
+
+| 层 | 选型 |
+|----|------|
+| 前端 | Next.js + TS + Tailwind（按 `features/*` 拆能力） |
+| 后端 | NestJS + 同名业务 Module |
+| 契约 | `packages/contracts`（Zod DTO / 路由约定） |
+| 数据（下一步） | PostgreSQL + Prisma + pgvector |
+| AI | `ai-gateway`（OpenAI 兼容；无 key 时 Heuristic 降级） |
+
+业务模块：`checkin` · `summary` · `memory` · `timeline` · `proactive` · `ai-gateway`
+
 ## 本地开发
 
 ```bash
 npm install
-npm run dev
+
+# 前端 demo（仍在仓库根目录，后续迁入 apps/web）
+npm run dev:web
+
+# 后端模块骨架
+npm run dev:api
 ```
 
-打开 [http://localhost:3000](http://localhost:3000)。
+- Web: [http://localhost:3000](http://localhost:3000)
+- API health: [http://localhost:3001/health](http://localhost:3001/health)
 
-当前为可运行的 MVP 原型：本地存储日记与记忆，AI 总结与主动关联使用本地启发式逻辑，便于先验证体验闭环。
+当前状态：产品愿景已定；**后端已按模块拆好骨架与契约**；前端仍有一份可点的页面 demo，下一步迁到 `features/*` 并接通 API。

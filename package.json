@@ -2,11 +2,20 @@
   "name": "today",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "next dev",
+    "dev:web": "next dev",
+    "dev:api": "npm run dev -w @today/api",
     "build": "next build",
+    "build:api": "npm run build -w @today/api",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck:api": "npm run typecheck -w @today/api",
+    "typecheck:contracts": "npm run typecheck -w @today/contracts"
   },
   "dependencies": {
     "next": "16.2.10",
