@@ -2,39 +2,38 @@ package com.today.memory;
 
 import com.today.aigateway.AiGatewayService;
 import com.today.aigateway.AiGatewayService.AiTask;
+import com.today.common.EntityMapper;
 import com.today.common.MemoryCategory;
 import com.today.identity.IdentityService;
+import com.today.persistence.MemoryEntity;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class MemoryService {
 
-  private final Map<String, MemoryDto> store = new ConcurrentHashMap<>();
+  private final MemoryMapper memoryMapper;
   private final AiGatewayService aiGateway;
   private final IdentityService identity;
 
-  public MemoryService(AiGatewayService aiGateway, IdentityService identity) {
+  public MemoryService(
+      MemoryMapper memoryMapper, AiGatewayService aiGateway, IdentityService identity) {
+    this.memoryMapper = memoryMapper;
     this.aiGateway = aiGateway;
     this.identity = identity;
   }
 
   public List<MemoryDto> list() {
-    String userId = identity.getCurrentUserId();
-    return store.values().stream()
-        .filter(m -> m.userId().equals(userId))
-        .sorted(
-            Comparator.comparing(MemoryDto::strength)
-                .reversed()
-                .thenComparing(Comparator.comparing(MemoryDto::updatedAt).reversed()))
+    return memoryMapper.listByUserId(identity.getCurrentUserId()).stream()
+        .map(EntityMapper::toDto)
         .toList();
   }
 
+  @Transactional
   public List<MemoryDto> upsertFromCheckin(String rawText) {
     var result =
         aiGateway.complete(
@@ -43,20 +42,25 @@ public class MemoryService {
             () -> heuristicExtract(rawText));
 
     String userId = identity.getCurrentUserId();
-    String now = Instant.now().toString();
+    Instant now = EntityMapper.now();
 
     for (MemoryCandidate item : result.data()) {
-      String id = userId + ":" + item.category() + ":" + item.text();
-      MemoryDto existing = store.get(id);
-      store.put(
-          id,
-          new MemoryDto(
-              id,
-              userId,
-              item.category(),
-              item.text(),
-              existing != null ? existing.strength() + 1 : 1,
-              now));
+      String id = userId + ":" + item.category().name() + ":" + item.text();
+      MemoryEntity existing = memoryMapper.findById(id);
+      if (existing == null) {
+        MemoryEntity created = new MemoryEntity();
+        created.setId(id);
+        created.setUserId(userId);
+        created.setCategory(item.category().name());
+        created.setMemoryText(item.text());
+        created.setStrength(1);
+        created.setUpdatedAt(now);
+        memoryMapper.insert(created);
+      } else {
+        existing.setStrength(existing.getStrength() + 1);
+        existing.setUpdatedAt(now);
+        memoryMapper.update(existing);
+      }
     }
 
     return list();

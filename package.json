@@ -9,6 +9,8 @@
     "dev": "next dev",
     "dev:web": "next dev",
     "dev:api": "cd apps/api && mvn spring-boot:run",
+    "db:up": "docker compose up -d mysql",
+    "db:down": "docker compose down",
     "build": "next build",
     "build:api": "cd apps/api && mvn -q package -DskipTests",
     "start": "next start",

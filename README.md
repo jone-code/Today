@@ -99,7 +99,7 @@ AI 自动整理、总结、建立长期记忆，并在未来主动关联。随�
 | 前端 | Next.js + TS + Tailwind（按 `features/*` 拆能力） |
 | 后端 | **Spring Boot 3 + Java 21**（按 `com.today.*` 包拆模块） |
 | 契约 | `packages/contracts`（前端 Zod；Java DTO 对齐） |
-| 数据（下一步） | PostgreSQL + JPA + Flyway + pgvector |
+| 数据 | **MySQL 8 + MyBatis**（原生，不用 MyBatis-Plus） |
 | AI | `ai-gateway`（OpenAI 兼容；无 key 时 Heuristic 降级） |
 
 业务模块：`checkin` · `summary` · `memory` · `timeline` · `proactive` · `ai-gateway`
@@ -109,12 +109,14 @@ AI 自动整理、总结、建立长期记忆，并在未来主动关联。随�
 ```bash
 npm install
 
+# MySQL（Docker）
+npm run db:up
+
 # 前端 demo（仍在仓库根目录，后续迁入 apps/web）
 npm run dev:web
 
-# 后端 Spring Boot（需 Java 21 + Maven）
+# 后端 Spring Boot（需 MySQL 已启动）
 npm run dev:api
-# 或：cd apps/api && mvn spring-boot:run
 ```
 
 - Web: [http://localhost:3000](http://localhost:3000)

@@ -3,59 +3,75 @@ package com.today.summary;
 import com.today.aigateway.AiGatewayService;
 import com.today.aigateway.AiGatewayService.AiTask;
 import com.today.common.AiProvider;
+import com.today.common.EntityMapper;
+import com.today.common.JsonUtils;
 import com.today.common.Mood;
+import com.today.identity.IdentityService;
+import com.today.persistence.DaySummaryEntity;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class SummaryService {
 
-  private static final Pattern SPLIT =
-      Pattern.compile("[。！？!?\\n；;]+");
+  private static final Pattern SPLIT = Pattern.compile("[。！？!?\\n；;]+");
   private static final List<String> KEYWORD_CANDIDATES =
       List.of("工作", "学习", "家庭", "运动", "创业", "面试");
 
-  private final Map<String, DaySummaryDto> store = new ConcurrentHashMap<>();
+  private final SummaryMapper summaryMapper;
   private final AiGatewayService aiGateway;
+  private final IdentityService identity;
 
-  public SummaryService(AiGatewayService aiGateway) {
+  public SummaryService(
+      SummaryMapper summaryMapper, AiGatewayService aiGateway, IdentityService identity) {
+    this.summaryMapper = summaryMapper;
     this.aiGateway = aiGateway;
+    this.identity = identity;
   }
 
+  @Transactional
   public DaySummaryDto generateForCheckin(String checkinId, String date, String rawText) {
     var result =
-        aiGateway.complete(AiTask.summary, Map.of("rawText", rawText), () -> heuristicSummary(rawText));
+        aiGateway.complete(
+            AiTask.summary, Map.of("rawText", rawText), () -> heuristicSummary(rawText));
 
-    DaySummaryDto dto =
-        new DaySummaryDto(
-            checkinId,
-            date,
-            result.data().completed(),
-            result.data().mood(),
-            result.data().moodLabel(),
-            result.data().keywords(),
-            result.data().oneLiner(),
-            result.data().highlight(),
-            result.provider(),
-            Instant.now().toString());
+    Instant now = EntityMapper.now();
+    LocalDate summaryDate = EntityMapper.parseDate(date);
+    String userId = identity.getCurrentUserId();
 
-    store.put(date, dto);
-    return dto;
+    DaySummaryEntity entity = new DaySummaryEntity();
+    entity.setCheckinId(checkinId);
+    entity.setUserId(userId);
+    entity.setSummaryDate(summaryDate);
+    entity.setCompletedJson(JsonUtils.toJson(result.data().completed()));
+    entity.setMood(result.data().mood().name());
+    entity.setMoodLabel(result.data().moodLabel());
+    entity.setKeywordsJson(JsonUtils.toJson(result.data().keywords()));
+    entity.setOneLiner(result.data().oneLiner());
+    entity.setHighlight(result.data().highlight());
+    entity.setProvider(result.provider().name());
+    entity.setCreatedAt(now);
+
+    summaryMapper.upsert(entity);
+    return EntityMapper.toDto(entity);
   }
 
   public DaySummaryDto getByDate(String date) {
-    DaySummaryDto found = store.get(date);
+    DaySummaryEntity found =
+        summaryMapper.findByUserIdAndDate(
+            identity.getCurrentUserId(), EntityMapper.parseDate(date));
     if (found == null) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "summary not found: " + date);
     }
-    return found;
+    return EntityMapper.toDto(found);
   }
 
   private SummaryPayload heuristicSummary(String rawText) {
@@ -87,7 +103,8 @@ public class SummaryService {
       }
     }
 
-    List<String> completed = parts.isEmpty() ? List.of("记录了今天的片刻") : parts.subList(0, Math.min(2, parts.size()));
+    List<String> completed =
+        parts.isEmpty() ? List.of("记录了今天的片刻") : parts.subList(0, Math.min(2, parts.size()));
     String highlight = completed.get(0);
 
     return new SummaryPayload(

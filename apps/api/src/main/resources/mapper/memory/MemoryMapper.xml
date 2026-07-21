@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.today.memory.MemoryMapper">
+
+  <resultMap id="MemoryEntityMap" type="com.today.persistence.MemoryEntity">
+    <id property="id" column="id"/>
+    <result property="userId" column="user_id"/>
+    <result property="category" column="category"/>
+    <result property="memoryText" column="memory_text"/>
+    <result property="strength" column="strength"/>
+    <result property="updatedAt" column="updated_at"/>
+  </resultMap>
+
+  <select id="findById" resultMap="MemoryEntityMap">
+    SELECT id, user_id, category, memory_text, strength, updated_at
+    FROM memories
+    WHERE id = #{id}
+    LIMIT 1
+  </select>
+
+  <select id="listByUserId" resultMap="MemoryEntityMap">
+    SELECT id, user_id, category, memory_text, strength, updated_at
+    FROM memories
+    WHERE user_id = #{userId}
+    ORDER BY strength DESC, updated_at DESC
+  </select>
+
+  <insert id="insert">
+    INSERT INTO memories (
+      id, user_id, category, memory_text, strength, updated_at
+    ) VALUES (
+      #{id}, #{userId}, #{category}, #{memoryText}, #{strength}, #{updatedAt}
+    )
+  </insert>
+
+  <update id="update">
+    UPDATE memories
+    SET strength = #{strength},
+        updated_at = #{updatedAt}
+    WHERE id = #{id}
+  </update>
+</mapper>

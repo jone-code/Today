@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.today.summary.SummaryMapper">
+
+  <resultMap id="DaySummaryEntityMap" type="com.today.persistence.DaySummaryEntity">
+    <id property="checkinId" column="checkin_id"/>
+    <result property="userId" column="user_id"/>
+    <result property="summaryDate" column="summary_date"/>
+    <result property="completedJson" column="completed_json"/>
+    <result property="mood" column="mood"/>
+    <result property="moodLabel" column="mood_label"/>
+    <result property="keywordsJson" column="keywords_json"/>
+    <result property="oneLiner" column="one_liner"/>
+    <result property="highlight" column="highlight"/>
+    <result property="provider" column="provider"/>
+    <result property="createdAt" column="created_at"/>
+  </resultMap>
+
+  <select id="findByUserIdAndDate" resultMap="DaySummaryEntityMap">
+    SELECT checkin_id, user_id, summary_date, completed_json, mood, mood_label,
+           keywords_json, one_liner, highlight, provider, created_at
+    FROM day_summaries
+    WHERE user_id = #{userId}
+      AND summary_date = #{summaryDate}
+    LIMIT 1
+  </select>
+
+  <insert id="upsert">
+    INSERT INTO day_summaries (
+      checkin_id, user_id, summary_date, completed_json, mood, mood_label,
+      keywords_json, one_liner, highlight, provider, created_at
+    ) VALUES (
+      #{checkinId}, #{userId}, #{summaryDate}, #{completedJson}, #{mood}, #{moodLabel},
+      #{keywordsJson}, #{oneLiner}, #{highlight}, #{provider}, #{createdAt}
+    )
+    ON DUPLICATE KEY UPDATE
+      checkin_id = VALUES(checkin_id),
+      completed_json = VALUES(completed_json),
+      mood = VALUES(mood),
+      mood_label = VALUES(mood_label),
+      keywords_json = VALUES(keywords_json),
+      one_liner = VALUES(one_liner),
+      highlight = VALUES(highlight),
+      provider = VALUES(provider),
+      created_at = VALUES(created_at)
+  </insert>
+</mapper>

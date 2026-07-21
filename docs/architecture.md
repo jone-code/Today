@@ -67,7 +67,9 @@ apps/web/src/
 |----|------|------|
 | 运行时 | **Java 21** | 稳定、生态成熟，适合长期演进的后端服务 |
 | 框架 | **Spring Boot 3** | 模块化清晰，与产品能力包一一对应 |
-| ORM（下一步） | **Spring Data JPA + Flyway** | 与 PostgreSQL 配套，迁移可控 |
+| ORM | **MyBatis**（原生，不用 MyBatis-Plus） | SQL 可控，与模块边界清晰 |
+| 数据库 | **MySQL 8** | 按你的要求 |
+| 迁移 | `db/schema.sql` + Docker init | 简单可重复 |
 | 校验 | **Jakarta Validation** + `packages/contracts` 路由约定 | 前端 Zod 契约与 Java DTO 对齐 |
 | API 风格 | **REST**（SpringDoc OpenAPI 可选） | MVP 简单；不先上 GraphQL |
 | 异步任务（二期） | **Spring + Redis / 消息队列** | 总结/记忆抽取可异步，避免阻塞提交 |
@@ -96,8 +98,8 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 
 | 项 | 选型 | 原因 |
 |----|------|------|
-| 主库 | **PostgreSQL** | 日记、记忆、时间轴结构化数据 |
-| 向量 | **pgvector** | 长期记忆语义检索，少引入新组件 |
+| 主库 | **MySQL 8** | 日记、记忆、时间轴结构化数据 |
+| 向量（二期） | 独立检索服务或 MySQL 外挂向量库 | MVP 先不做语义检索 |
 | 缓存/队列 | **Redis**（二期） | 主动关联扫描、异步总结 |
 | 对象存储 | S3 兼容（图片期再上） | MVP 不做图片 |
 | LLM | **OpenAI 兼容 API**（环境变量切换） | 国内/海外模型可换 |
@@ -112,7 +114,7 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 | 项 | 选型 |
 |----|------|
 | 包管理 | npm workspaces（或 pnpm） |
-| 本地 DB | Docker Compose：Postgres（+ Redis 可选） |
+| 本地 DB | Docker Compose：MySQL 8 |
 | 配置 | `.env` + 各 app 的 schema 校验 |
 | 测试 | Vitest（domain/api），前端关键 Testing Library 后补 |
 
@@ -245,7 +247,7 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 ## 8. 落地顺序（下一步开发）
 
 1. ✅ `packages/contracts` + Spring Boot 模块骨架（checkin/summary/memory/timeline/proactive/aigateway）
-2. JPA + Flyway + PostgreSQL（+ pgvector）
+2. ✅ JPA 改为 **MyBatis + MySQL**（`db/schema.sql`）
 3. 迁 `apps/web`，features 对接真实 API
 4. 在 `aigateway` 接通 LLM HTTP Client；保留 Heuristic 降级
 5. 补 proactive 检索式关联（不再只靠正则）
@@ -255,6 +257,6 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 ## 9. 选型一句话结论
 
 - **前端：** Next.js + TS + Tailwind + TanStack Query，按 `features/*` 对齐产品能力。  
-- **后端：** Spring Boot 3 + Java 21 + JPA + PostgreSQL(+pgvector)，按同名业务包拆分。  
+- **后端：** Spring Boot 3 + Java 21 + **MyBatis + MySQL**，按同名业务包拆分。  
 - **AI：** 独立 `aigateway`，OpenAI 兼容协议；无 key 时 Heuristic 降级。  
 - **共享：** `packages/contracts` 约束模块边界与 HTTP 路由（Java DTO 手动对齐）。
