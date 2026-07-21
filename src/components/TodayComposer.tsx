@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { moodEmoji } from "@/lib/ai";
 import { useToday } from "@/lib/today-context";
 
@@ -8,16 +8,25 @@ export function TodayComposer() {
   const { todayEntry, prompts, saveToday, ready } = useToday();
   const [text, setText] = useState("");
   const [justSaved, setJustSaved] = useState(false);
-  const [isPending, startTransition] = useTransition();
+  const [saving, setSaving] = useState(false);
 
-  const onSubmit = (e: FormEvent) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!text.trim()) return;
-    startTransition(() => {
-      saveToday(text);
-      setText("");
-      setJustSaved(true);
-    });
+    if (!text.trim() || saving) return;
+    const payload = text;
+    setJustSaved(true);
+    setText("");
+    setSaving(true);
+
+    try {
+      await saveToday(payload);
+    } catch {
+      // 失败时回滚编辑状态（demo 场景）
+      setJustSaved(false);
+      setText(payload);
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!ready) {
@@ -71,8 +80,8 @@ export function TodayComposer() {
         />
         <div className="composer-actions">
           <span className="hint">大约 30 秒就够</span>
-          <button type="submit" disabled={!text.trim() || isPending}>
-            {isPending ? "记住中…" : "留下今天"}
+          <button type="submit" disabled={!text.trim() || saving}>
+            {saving ? "记住中…" : "留下今天"}
           </button>
         </div>
       </form>
