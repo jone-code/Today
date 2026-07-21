@@ -97,9 +97,9 @@ AI 自动整理、总结、建立长期记忆，并在未来主动关联。随�
 | 层 | 选型 |
 |----|------|
 | 前端 | Next.js + TS + Tailwind（按 `features/*` 拆能力） |
-| 后端 | NestJS + 同名业务 Module |
-| 契约 | `packages/contracts`（Zod DTO / 路由约定） |
-| 数据（下一步） | PostgreSQL + Prisma + pgvector |
+| 后端 | **Spring Boot 3 + Java 21**（按 `com.today.*` 包拆模块） |
+| 契约 | `packages/contracts`（前端 Zod；Java DTO 对齐） |
+| 数据（下一步） | PostgreSQL + JPA + Flyway + pgvector |
 | AI | `ai-gateway`（OpenAI 兼容；无 key 时 Heuristic 降级） |
 
 业务模块：`checkin` · `summary` · `memory` · `timeline` · `proactive` · `ai-gateway`
@@ -112,11 +112,12 @@ npm install
 # 前端 demo（仍在仓库根目录，后续迁入 apps/web）
 npm run dev:web
 
-# 后端模块骨架
+# 后端 Spring Boot（需 Java 21 + Maven）
 npm run dev:api
+# 或：cd apps/api && mvn spring-boot:run
 ```
 
 - Web: [http://localhost:3000](http://localhost:3000)
 - API health: [http://localhost:3001/health](http://localhost:3001/health)
 
-当前状态：产品愿景已定；**后端已按模块拆好骨架与契约**；前端仍有一份可点的页面 demo，下一步迁到 `features/*` 并接通 API。
+当前状态：产品愿景已定；**后端已用 Spring Boot 按模块拆好**；前端仍有一份可点的页面 demo，下一步迁到 `features/*` 并接通 API。

@@ -20,7 +20,7 @@
 today/
 ├── apps/
 │   ├── web/                 # 前端 Next.js
-│   └── api/                 # 后端 NestJS
+│   └── api/                 # 后端 Spring Boot（Java）
 ├── packages/
 │   ├── contracts/           # 跨端 DTO / API 契约 / 错误码
 │   └── config/              # 共享 eslint/tsconfig（可选）
@@ -65,18 +65,32 @@ apps/web/src/
 
 | 项 | 选型 | 原因 |
 |----|------|------|
-| 运行时 | **Node.js + TypeScript** | 与前端同语言，契约共享成本最低 |
-| 框架 | **NestJS** | 天然 module 边界，和产品模块一一映射 |
-| ORM | **Prisma** | 迁移清晰，后期加 pgvector 扩展方便 |
-| 校验 | **Zod**（contracts 共享） | 前后端同一套 schema |
-| API 风格 | **REST**（OpenAPI 生成可选） | MVP 简单；不先上 GraphQL |
-| 异步任务 | **BullMQ + Redis**（可二期） | 总结/记忆抽取可异步，避免阻塞提交 |
+| 运行时 | **Java 21** | 稳定、生态成熟，适合长期演进的后端服务 |
+| 框架 | **Spring Boot 3** | 模块化清晰，与产品能力包一一对应 |
+| ORM（下一步） | **Spring Data JPA + Flyway** | 与 PostgreSQL 配套，迁移可控 |
+| 校验 | **Jakarta Validation** + `packages/contracts` 路由约定 | 前端 Zod 契约与 Java DTO 对齐 |
+| API 风格 | **REST**（SpringDoc OpenAPI 可选） | MVP 简单；不先上 GraphQL |
+| 异步任务（二期） | **Spring + Redis / 消息队列** | 总结/记忆抽取可异步，避免阻塞提交 |
 
-**为何不选「纯 Next.js Route Handlers 当后端」：**  
-产品核心是记忆与主动关联，后续会有任务队列、多模型、检索链路；独立 `api` 更利于模块化与演进。
+**Java 包结构（与产品模块同名）：**
+
+```text
+apps/api/src/main/java/com/today/
+├── checkin/
+├── summary/
+├── memory/
+├── timeline/
+├── proactive/
+├── aigateway/
+├── identity/
+└── health/
+```
+
+**为何不选 Node 当后端：**  
+按你的要求，后端统一用 Spring Boot；前端仍用 TypeScript，`packages/contracts` 作为 API 契约源。
 
 **为何不先上 Python：**  
-AI 编排用 TS（Vercel AI SDK / OpenAI SDK）足够；若以后要重度训练/批处理，再抽 `workers/` 服务，不必现在分裂语言栈。
+AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后要重度批处理，再抽独立 worker。
 
 ### 3.3 数据与 AI
 
@@ -230,18 +244,17 @@ AI 编排用 TS（Vercel AI SDK / OpenAI SDK）足够；若以后要重度训练
 
 ## 8. 落地顺序（下一步开发）
 
-1. 建 npm workspaces + `packages/contracts`（本阶段可先落契约）
-2. 建 `apps/api` NestJS 模块空壳（checkin/summary/memory/timeline/proactive/ai-gateway）
-3. Prisma schema + Postgres
-4. 迁 `apps/web`，features 对接真实 API
-5. 接通 LLM Provider；保留 Heuristic 降级
-6. 补 proactive 检索式关联（不再只靠正则）
+1. ✅ `packages/contracts` + Spring Boot 模块骨架（checkin/summary/memory/timeline/proactive/aigateway）
+2. JPA + Flyway + PostgreSQL（+ pgvector）
+3. 迁 `apps/web`，features 对接真实 API
+4. 在 `aigateway` 接通 LLM HTTP Client；保留 Heuristic 降级
+5. 补 proactive 检索式关联（不再只靠正则）
 
 ---
 
 ## 9. 选型一句话结论
 
 - **前端：** Next.js + TS + Tailwind + TanStack Query，按 `features/*` 对齐产品能力。  
-- **后端：** NestJS + Prisma + PostgreSQL(+pgvector)，按同名业务 Module 拆分。  
-- **AI：** 独立 `ai-gateway`，OpenAI 兼容协议；无 key 时 Heuristic 降级。  
-- **共享：** `packages/contracts` 约束模块边界与接口。
+- **后端：** Spring Boot 3 + Java 21 + JPA + PostgreSQL(+pgvector)，按同名业务包拆分。  
+- **AI：** 独立 `aigateway`，OpenAI 兼容协议；无 key 时 Heuristic 降级。  
+- **共享：** `packages/contracts` 约束模块边界与 HTTP 路由（Java DTO 手动对齐）。

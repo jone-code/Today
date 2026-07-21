@@ -3,18 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "workspaces": [
-    "apps/*",
     "packages/*"
   ],
   "scripts": {
     "dev": "next dev",
     "dev:web": "next dev",
-    "dev:api": "npm run dev -w @today/api",
+    "dev:api": "cd apps/api && mvn spring-boot:run",
     "build": "next build",
-    "build:api": "npm run build -w @today/api",
+    "build:api": "cd apps/api && mvn -q package -DskipTests",
     "start": "next start",
     "lint": "eslint",
-    "typecheck:api": "npm run typecheck -w @today/api",
     "typecheck:contracts": "npm run typecheck -w @today/contracts"
   },
   "dependencies": {

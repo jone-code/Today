@@ -12,4 +12,4 @@
 | timeline | `src/timeline.ts` |
 | proactive | `src/proactive.ts` |
 
-前端与 `apps/api` 只依赖本包类型/校验，不互相直接引用实现。
+前端与 `apps/api`（Spring Boot）依赖本包的路由与字段约定；Java 侧 DTO 在 `com.today.*` 包中手动对齐。

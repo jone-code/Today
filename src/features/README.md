@@ -1,6 +1,6 @@
 # 前端 features（过渡目录）
 
-与后端 Nest 模块同名。根目录 Next.js demo 将逐步迁入这些目录，并改为只调用 `apps/api`。
+与后端 Spring Boot 包（`com.today.*`）同名。根目录 Next.js demo 将逐步迁入这些目录，并改为只调用 `apps/api`。
 
 | 模块 | 职责 |
 |------|------|
