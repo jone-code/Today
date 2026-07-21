@@ -1,0 +1,35 @@
+{
+  "name": "today",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "next dev",
+    "dev:web": "next dev",
+    "dev:api": "cd apps/api && mvn spring-boot:run",
+    "db:up": "docker compose up -d mysql",
+    "db:down": "docker compose down",
+    "build": "next build",
+    "build:api": "cd apps/api && mvn -q package -DskipTests",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck:contracts": "npm run typecheck -w @today/contracts"
+  },
+  "dependencies": {
+    "next": "16.2.10",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.10",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

@@ -1,0 +1,20 @@
+server:
+  port: ${PORT:3001}
+
+spring:
+  application:
+    name: today-api
+  datasource:
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/today?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8}
+    username: ${MYSQL_USER:today}
+    password: ${MYSQL_PASSWORD:today}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: com.today.persistence
+  configuration:
+    map-underscore-to-camel-case: true
+
+today:
+  dev-user-id: ${TODAY_DEV_USER_ID:dev-user}
