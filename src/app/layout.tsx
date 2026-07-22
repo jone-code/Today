@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, Noto_Sans_SC } from "next/font/google";
+import { Providers } from "@/components/Providers";
 import "./globals.css";
 
 const display = Fraunces({
@@ -27,7 +28,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN" className={`${display.variable} ${body.variable} h-full`}>
-      <body className="site-shell antialiased">{children}</body>
+      <body className="site-shell antialiased">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

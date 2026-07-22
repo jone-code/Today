@@ -22,6 +22,7 @@ import {
   apiGetTimeline,
   apiGetTodayCheckin,
   apiPostCheckin,
+  getAuthToken,
   type CheckinDto,
   type DaySummaryDto,
   type MemoryDto,
@@ -97,6 +98,9 @@ function mapPromptDtoToPrompt(p: ProactivePromptDto): ProactivePrompt {
 }
 
 async function tryLoadFromApi() {
+  if (!getAuthToken()) {
+    throw new Error("no auth token");
+  }
   const checkinRes = await apiGetTodayCheckin();
   const [timelineRes, memoriesRes, proactiveRes] = await Promise.all([
     apiGetTimeline(30),

@@ -5,8 +5,8 @@ export default function HomePage() {
     <div className="landing">
       <header className="landing-top">
         <span className="brand-mark">Today</span>
-        <Link href="/app" className="ghost-link">
-          打开今天
+        <Link href="/login" className="ghost-link">
+          登录
         </Link>
       </header>
 
@@ -19,12 +19,12 @@ export default function HomePage() {
             每天只用 30 秒留下今天。整理、总结与长期记忆，交给一直记得你的 AI。
           </p>
           <div className="cta-row">
-            <Link href="/app" className="btn-primary">
-              留下今天
+            <Link href="/register" className="btn-primary">
+              开始留下今天
             </Link>
-            <a href="#why" className="btn-secondary">
-              为什么存在
-            </a>
+            <Link href="/login" className="btn-secondary">
+              已有账号登录
+            </Link>
           </div>
         </div>
       </section>

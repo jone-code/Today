@@ -17,4 +17,6 @@ mybatis:
     map-underscore-to-camel-case: true
 
 today:
-  dev-user-id: ${TODAY_DEV_USER_ID:dev-user}
+  jwt:
+    secret: ${TODAY_JWT_SECRET:today-dev-jwt-secret-change-me-please-32bytes}
+    expire-hours: ${TODAY_JWT_EXPIRE_HOURS:168}

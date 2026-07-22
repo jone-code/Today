@@ -6,27 +6,39 @@ type ApiError = {
 };
 
 const DEFAULT_API_BASE_URL = "http://localhost:3001";
+const TOKEN_KEY = "today.auth.token.v1";
 
-function getApiBaseUrl() {
-  // Client-side env var
+export function getApiBaseUrl() {
   const v = process.env.NEXT_PUBLIC_API_BASE_URL;
   return v && v.length > 0 ? v : DEFAULT_API_BASE_URL;
 }
 
-async function requestJson<T>(
-  path: string,
-  init?: RequestInit,
-): Promise<T> {
+export function getAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setAuthToken(token: string | null) {
+  if (typeof window === "undefined") return;
+  if (!token) localStorage.removeItem(TOKEN_KEY);
+  else localStorage.setItem(TOKEN_KEY, token);
+}
+
+async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const controller = new AbortController();
   const timeoutMs = 8000;
   const t = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    const token = getAuthToken();
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+      ...(init?.headers as Record<string, string> | undefined),
+    };
+    if (token) headers.authorization = `Bearer ${token}`;
+
     const res = await fetch(`${getApiBaseUrl()}${path}`, {
       ...init,
-      headers: {
-        "content-type": "application/json",
-        ...(init?.headers ?? {}),
-      },
+      headers,
       signal: controller.signal,
     });
     const text = await res.text();
@@ -35,12 +47,13 @@ async function requestJson<T>(
       try {
         parsed = text ? (JSON.parse(text) as ApiError) : undefined;
       } catch {
-        // ignore parse errors
+        // ignore
       }
-      throw new Error(
-        parsed?.message ||
-          `API request failed: ${res.status} ${res.statusText}`,
-      );
+      const err = new Error(
+        parsed?.message || `API request failed: ${res.status} ${res.statusText}`,
+      ) as Error & { status?: number };
+      err.status = res.status;
+      throw err;
     }
     if (!text) return undefined as T;
     return JSON.parse(text) as T;
@@ -48,6 +61,19 @@ async function requestJson<T>(
     clearTimeout(t);
   }
 }
+
+export type UserDto = {
+  id: string;
+  email: string;
+  displayName: string;
+  createdAt: string;
+};
+
+export type AuthTokenResponse = {
+  token: string;
+  tokenType: "Bearer";
+  user: UserDto;
+};
 
 export type CheckinDto = {
   id: string;
@@ -74,13 +100,7 @@ export type DaySummaryDto = {
 export type MemoryDto = {
   id: string;
   userId: string;
-  category:
-    | "work"
-    | "health"
-    | "learning"
-    | "life"
-    | "emotion"
-    | "goal";
+  category: "work" | "health" | "learning" | "life" | "emotion" | "goal";
   text: string;
   strength: number;
   updatedAt: string;
@@ -113,6 +133,55 @@ export type TimelinePageDto = {
   nextCursor: string | null;
 };
 
+export type ReminderDto = {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  remindTime: string;
+  timezone: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ReminderDeliveryDto = {
+  id: string;
+  reminderId: string;
+  userId: string;
+  fireDate: string;
+  title: string;
+  message: string;
+  status: "pending" | "read";
+  createdAt: string;
+  readAt: string | null;
+};
+
+export async function apiRegister(input: {
+  email: string;
+  password: string;
+  displayName: string;
+}): Promise<AuthTokenResponse> {
+  return requestJson("/v1/auth/register", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function apiLogin(input: {
+  email: string;
+  password: string;
+}): Promise<AuthTokenResponse> {
+  return requestJson("/v1/auth/login", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function apiMe(): Promise<UserDto> {
+  return requestJson("/v1/auth/me");
+}
+
 export async function apiGetTodayCheckin(): Promise<{
   checkin: CheckinDto | null;
 }> {
@@ -141,9 +210,61 @@ export async function apiGetProactiveToday(): Promise<ProactiveTodayDto> {
   return requestJson("/v1/proactive/today");
 }
 
-export async function apiGetTimeline(
-  limit = 30,
-): Promise<TimelinePageDto> {
+export async function apiGetTimeline(limit = 30): Promise<TimelinePageDto> {
   return requestJson(`/v1/timeline?limit=${encodeURIComponent(String(limit))}`);
 }
 
+export async function apiListReminders(): Promise<{ items: ReminderDto[] }> {
+  return requestJson("/v1/reminders");
+}
+
+export async function apiCreateReminder(input: {
+  title: string;
+  message: string;
+  remindTime: string;
+  timezone?: string;
+  enabled?: boolean;
+}): Promise<ReminderDto> {
+  return requestJson("/v1/reminders", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function apiUpdateReminder(
+  id: string,
+  input: Partial<{
+    title: string;
+    message: string;
+    remindTime: string;
+    timezone: string;
+    enabled: boolean;
+  }>,
+): Promise<ReminderDto> {
+  return requestJson(`/v1/reminders/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function apiDeleteReminder(id: string): Promise<void> {
+  await requestJson(`/v1/reminders/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function apiListReminderDeliveries(
+  limit = 30,
+): Promise<{ items: ReminderDeliveryDto[] }> {
+  return requestJson(
+    `/v1/reminders/deliveries?limit=${encodeURIComponent(String(limit))}`,
+  );
+}
+
+export async function apiMarkReminderDeliveryRead(
+  id: string,
+): Promise<ReminderDeliveryDto> {
+  return requestJson(`/v1/reminders/deliveries/${encodeURIComponent(id)}/read`, {
+    method: "POST",
+  });
+}

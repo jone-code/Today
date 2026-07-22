@@ -1,19 +1,26 @@
 package com.today.identity;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
-/** MVP：无登录，统一开发用户，表结构仍带 userId */
+/** 从 JWT SecurityContext 解析当前用户；无鉴权上下文时抛错 */
 @Service
 public class IdentityService {
 
-  private final String devUserId;
-
-  public IdentityService(@Value("${today.dev-user-id:dev-user}") String devUserId) {
-    this.devUserId = devUserId;
+  public String getCurrentUserId() {
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth == null || !(auth.getPrincipal() instanceof AuthUserPrincipal principal)) {
+      throw new IllegalStateException("unauthenticated");
+    }
+    return principal.getUserId();
   }
 
-  public String getCurrentUserId() {
-    return devUserId;
+  public AuthUserPrincipal requirePrincipal() {
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth == null || !(auth.getPrincipal() instanceof AuthUserPrincipal principal)) {
+      throw new IllegalStateException("unauthenticated");
+    }
+    return principal;
   }
 }

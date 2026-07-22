@@ -102,7 +102,7 @@ AI 自动整理、总结、建立长期记忆，并在未来主动关联。随�
 | 数据 | **MySQL 8 + MyBatis**（原生，不用 MyBatis-Plus） |
 | AI | `ai-gateway`（OpenAI 兼容；无 key 时 Heuristic 降级） |
 
-业务模块：`checkin` · `summary` · `memory` · `timeline` · `proactive` · `ai-gateway`
+业务模块：`checkin` · `summary` · `memory` · `timeline` · `proactive` · `identity` · `reminder` · `ai-gateway`
 
 ## 本地开发
 
@@ -111,15 +111,16 @@ npm install
 
 # MySQL（Docker）
 npm run db:up
+# 若是旧库，再执行 apps/api/src/main/resources/db/migration-auth-reminder.sql
 
-# 前端 demo（仍在仓库根目录，后续迁入 apps/web）
-npm run dev:web
-
-# 后端 Spring Boot（需 MySQL 已启动）
+# 后端 Spring Boot
 npm run dev:api
+
+# 前端
+npm run dev:web
 ```
 
-- Web: [http://localhost:3000](http://localhost:3000)
+- Web: [http://localhost:3000](http://localhost:3000)（`/login` `/register` `/app` `/app/reminders`）
 - API health: [http://localhost:3001/health](http://localhost:3001/health)
 
-当前状态：产品愿景已定；**后端已用 Spring Boot 按模块拆好**；前端仍有一份可点的页面 demo，下一步迁到 `features/*` 并接通 API。
+当前状态：**注册登录（JWT）与定时提醒已落地**；AI 仍为 Heuristic 降级；未登录时前端可本地 fallback。

@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.today.reminder.ReminderMapper">
+
+  <resultMap id="ReminderEntityMap" type="com.today.persistence.ReminderEntity">
+    <id property="id" column="id"/>
+    <result property="userId" column="user_id"/>
+    <result property="title" column="title"/>
+    <result property="message" column="message"/>
+    <result property="remindTime" column="remind_time"/>
+    <result property="timezone" column="timezone"/>
+    <result property="enabled" column="enabled"/>
+    <result property="createdAt" column="created_at"/>
+    <result property="updatedAt" column="updated_at"/>
+  </resultMap>
+
+  <resultMap id="DeliveryEntityMap" type="com.today.persistence.ReminderDeliveryEntity">
+    <id property="id" column="id"/>
+    <result property="reminderId" column="reminder_id"/>
+    <result property="userId" column="user_id"/>
+    <result property="fireDate" column="fire_date"/>
+    <result property="title" column="title"/>
+    <result property="message" column="message"/>
+    <result property="status" column="status"/>
+    <result property="createdAt" column="created_at"/>
+    <result property="readAt" column="read_at"/>
+  </resultMap>
+
+  <select id="findById" resultMap="ReminderEntityMap">
+    SELECT id, user_id, title, message, remind_time, timezone, enabled, created_at, updated_at
+    FROM reminders
+    WHERE id = #{id}
+    LIMIT 1
+  </select>
+
+  <select id="listByUserId" resultMap="ReminderEntityMap">
+    SELECT id, user_id, title, message, remind_time, timezone, enabled, created_at, updated_at
+    FROM reminders
+    WHERE user_id = #{userId}
+    ORDER BY remind_time ASC, created_at DESC
+  </select>
+
+  <select id="listEnabled" resultMap="ReminderEntityMap">
+    SELECT id, user_id, title, message, remind_time, timezone, enabled, created_at, updated_at
+    FROM reminders
+    WHERE enabled = 1
+  </select>
+
+  <insert id="insert">
+    INSERT INTO reminders (
+      id, user_id, title, message, remind_time, timezone, enabled, created_at, updated_at
+    ) VALUES (
+      #{id}, #{userId}, #{title}, #{message}, #{remindTime}, #{timezone}, #{enabled},
+      #{createdAt}, #{updatedAt}
+    )
+  </insert>
+
+  <update id="update">
+    UPDATE reminders
+    SET title = #{title},
+        message = #{message},
+        remind_time = #{remindTime},
+        timezone = #{timezone},
+        enabled = #{enabled},
+        updated_at = #{updatedAt}
+    WHERE id = #{id}
+      AND user_id = #{userId}
+  </update>
+
+  <delete id="deleteByIdAndUserId">
+    DELETE FROM reminders
+    WHERE id = #{id}
+      AND user_id = #{userId}
+  </delete>
+
+  <select id="findDelivery" resultMap="DeliveryEntityMap">
+    SELECT id, reminder_id, user_id, fire_date, title, message, status, created_at, read_at
+    FROM reminder_deliveries
+    WHERE reminder_id = #{reminderId}
+      AND fire_date = #{fireDate}
+    LIMIT 1
+  </select>
+
+  <insert id="insertDelivery">
+    INSERT INTO reminder_deliveries (
+      id, reminder_id, user_id, fire_date, title, message, status, created_at, read_at
+    ) VALUES (
+      #{id}, #{reminderId}, #{userId}, #{fireDate}, #{title}, #{message}, #{status},
+      #{createdAt}, #{readAt}
+    )
+  </insert>
+
+  <select id="listDeliveriesByUserId" resultMap="DeliveryEntityMap">
+    SELECT id, reminder_id, user_id, fire_date, title, message, status, created_at, read_at
+    FROM reminder_deliveries
+    WHERE user_id = #{userId}
+    ORDER BY created_at DESC
+    LIMIT #{limit}
+  </select>
+
+  <update id="markDeliveryRead">
+    UPDATE reminder_deliveries
+    SET status = 'read',
+        read_at = #{readAt}
+    WHERE id = #{id}
+      AND user_id = #{userId}
+  </update>
+</mapper>
