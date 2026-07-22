@@ -65,7 +65,7 @@ apps/web/src/
 
 | 项 | 选型 | 原因 |
 |----|------|------|
-| 运行时 | **Java 21** | 稳定、生态成熟，适合长期演进的后端服务 |
+| 运行时 | **Java 17** | LTS，稳定且与 Spring Boot 3 匹配 |
 | 框架 | **Spring Boot 3** | 模块化清晰，与产品能力包一一对应 |
 | ORM | **MyBatis**（原生，不用 MyBatis-Plus） | SQL 可控，与模块边界清晰 |
 | 数据库 | **MySQL 8** | 按你的要求 |
@@ -257,6 +257,6 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 ## 9. 选型一句话结论
 
 - **前端：** Next.js + TS + Tailwind + TanStack Query，按 `features/*` 对齐产品能力。  
-- **后端：** Spring Boot 3 + Java 21 + **MyBatis + MySQL**，按同名业务包拆分。  
+- **后端：** Spring Boot 3 + Java 17 + **MyBatis + MySQL**，按同名业务包拆分。  
 - **AI：** 独立 `aigateway`，OpenAI 兼容协议；无 key 时 Heuristic 降级。  
 - **共享：** `packages/contracts` 约束模块边界与 HTTP 路由（Java DTO 手动对齐）。

@@ -1,6 +1,6 @@
 # `@today/api` — Spring Boot 后端
 
-Java 21 + Spring Boot 3 + **MyBatis + MySQL**（原生 MyBatis，不用 MyBatis-Plus）。
+Java 17 + Spring Boot 3 + **MyBatis + MySQL**（原生 MyBatis，不用 MyBatis-Plus）。
 
 ## 模块包
 
