@@ -22,6 +22,7 @@ public class HealthController {
                 "timeline",
                 "proactive",
                 "ai-gateway",
-                "identity"));
+                "identity",
+                "reminder"));
   }
 }

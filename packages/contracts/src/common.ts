@@ -10,11 +10,18 @@ export type ApiError = z.infer<typeof ApiErrorSchema>;
 
 /** 模块对外 HTTP 路径约定（api 实现必须对齐） */
 export const ApiRoutes = {
+  authRegister: "/v1/auth/register",
+  authLogin: "/v1/auth/login",
+  authMe: "/v1/auth/me",
   checkinToday: "/v1/checkins/today",
   checkins: "/v1/checkins",
   summaryByDate: "/v1/summaries/:date",
   memories: "/v1/memories",
   timeline: "/v1/timeline",
   proactiveToday: "/v1/proactive/today",
+  reminders: "/v1/reminders",
+  reminderById: "/v1/reminders/:id",
+  reminderDeliveries: "/v1/reminders/deliveries",
+  reminderDeliveryRead: "/v1/reminders/deliveries/:id/read",
   health: "/health",
 } as const;

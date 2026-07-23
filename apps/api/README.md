@@ -1,6 +1,6 @@
 # `@today/api` — Spring Boot 后端
 
-Java 21 + Spring Boot 3 + **MyBatis + MySQL**（原生 MyBatis，不用 MyBatis-Plus）。
+Java 17 + Spring Boot 3 + **MyBatis + MySQL**（原生 MyBatis，不用 MyBatis-Plus）。
 
 ## 模块包
 
@@ -50,7 +50,27 @@ npm run dev:api
 | `MYSQL_URL` | `jdbc:mysql://localhost:3306/today?...` | JDBC 连接 |
 | `MYSQL_USER` | `today` | 数据库用户 |
 | `MYSQL_PASSWORD` | `today` | 数据库密码 |
-| `TODAY_DEV_USER_ID` | `dev-user` | MVP 开发用户 |
+| `TODAY_JWT_SECRET` | 开发默认值（请更换） | JWT 签名密钥，至少 32 字节 |
+| `TODAY_JWT_EXPIRE_HOURS` | `168` | Token 有效小时数 |
 | `OPENAI_API_KEY` | — | 有值时走 LLM（尚未接通） |
 
-表结构见 `src/main/resources/db/schema.sql`。
+## 认证
+
+- `POST /v1/auth/register` — 注册
+- `POST /v1/auth/login` — 登录
+- `GET /v1/auth/me` — 当前用户（需 Bearer Token）
+
+其余 `/v1/**` 接口均需 `Authorization: Bearer <token>`。
+
+## 定时提醒
+
+- `GET/POST /v1/reminders`
+- `PUT/DELETE /v1/reminders/{id}`
+- `GET /v1/reminders/deliveries`
+- `POST /v1/reminders/deliveries/{id}/read`
+
+调度器每分钟扫描一次到期提醒，写入 `reminder_deliveries`。
+
+若数据库已初始化，请执行 `src/main/resources/db/migration-auth-reminder.sql`。
+
+表结构完整版见 `src/main/resources/db/schema.sql`。

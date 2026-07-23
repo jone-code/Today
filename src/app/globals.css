@@ -294,9 +294,26 @@ textarea {
 
 .app-nav {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.35rem;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 1.75rem;
   border-bottom: 1px solid var(--line);
+}
+
+.app-nav-links,
+.app-nav-auth {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  align-items: center;
+}
+
+.nav-user {
+  padding: 0.7rem 0.85rem;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
 }
 
 .nav-link {
@@ -615,3 +632,98 @@ textarea {
     transition: none !important;
   }
 }
+
+.auth-shell {
+  min-height: 100vh;
+  max-width: 28rem;
+  margin: 0 auto;
+  padding: 0 1.15rem 3rem;
+}
+
+.auth-form,
+.reminder-form {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 1.5rem;
+}
+
+.auth-form h1,
+.reminder-form h2,
+.reminder-panel h2 {
+  margin: 0;
+  font-family: var(--font-display), "Noto Serif SC", serif;
+  font-weight: 500;
+}
+
+.auth-form label,
+.reminder-form label {
+  display: grid;
+  gap: 0.4rem;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+}
+
+.auth-form input,
+.reminder-form input,
+.reminder-form textarea,
+.composer textarea {
+  width: 100%;
+}
+
+.auth-form input,
+.reminder-form input,
+.reminder-form textarea {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--ink);
+  outline: none;
+}
+
+.auth-form input:focus,
+.reminder-form input:focus,
+.reminder-form textarea:focus {
+  border-color: rgba(47, 111, 108, 0.45);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.form-error {
+  margin: 0;
+  color: #9b3b3b;
+}
+
+.reminder-panel {
+  display: grid;
+  gap: 2rem;
+}
+
+.reminder-list {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.reminder-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.reminder-item strong {
+  font-family: var(--font-display), "Noto Serif SC", serif;
+  font-size: 1.1rem;
+}
+
+.reminder-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: flex-end;
+}
+

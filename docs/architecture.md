@@ -65,7 +65,7 @@ apps/web/src/
 
 | 项 | 选型 | 原因 |
 |----|------|------|
-| 运行时 | **Java 21** | 稳定、生态成熟，适合长期演进的后端服务 |
+| 运行时 | **Java 17** | LTS，稳定且与 Spring Boot 3 匹配 |
 | 框架 | **Spring Boot 3** | 模块化清晰，与产品能力包一一对应 |
 | ORM | **MyBatis**（原生，不用 MyBatis-Plus） | SQL 可控，与模块边界清晰 |
 | 数据库 | **MySQL 8** | 按你的要求 |
@@ -85,6 +85,7 @@ apps/api/src/main/java/com/today/
 ├── proactive/
 ├── aigateway/
 ├── identity/
+├── reminder/
 └── health/
 ```
 
@@ -201,10 +202,26 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
   - `complete(task: 'summary' | 'memory_extract' | 'proactive', input)`
   - `embed(texts: string[])`
 
-#### `identity` — 用户（二期，占位）
+#### `identity` — 用户注册登录
 
-- MVP demo 可用固定 `dev-user`。
-- 预留 `userId` 字段，所有表从第一天带上。
+- **负责：** 注册、登录、JWT 签发、当前用户解析。
+- **核心 API：**
+  - `POST /v1/auth/register`
+  - `POST /v1/auth/login`
+  - `GET /v1/auth/me`
+- **数据：** `users`
+- **实现：** Spring Security + JWT；`IdentityService.getCurrentUserId()` 从 SecurityContext 读取。
+
+#### `reminder` — 定时提醒
+
+- **负责：** 每日提醒配置、到点投递记录。
+- **核心 API：**
+  - `GET/POST /v1/reminders`
+  - `PUT/DELETE /v1/reminders/:id`
+  - `GET /v1/reminders/deliveries`
+  - `POST /v1/reminders/deliveries/:id/read`
+- **数据：** `reminders`、`reminder_deliveries`
+- **调度：** `@Scheduled` 每分钟扫描到期提醒并写入投递。
 
 ---
 
@@ -234,6 +251,8 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 - `MemoryDto`
 - `TimelineItemDto`
 - `ProactivePromptDto`
+- `Auth*` / `UserDto`
+- `ReminderDto` / `ReminderDeliveryDto`
 - 统一 `ApiError`
 
 ---
@@ -247,16 +266,17 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 ## 8. 落地顺序（下一步开发）
 
 1. ✅ `packages/contracts` + Spring Boot 模块骨架（checkin/summary/memory/timeline/proactive/aigateway）
-2. ✅ JPA 改为 **MyBatis + MySQL**（`db/schema.sql`）
-3. 迁 `apps/web`，features 对接真实 API
-4. 在 `aigateway` 接通 LLM HTTP Client；保留 Heuristic 降级
-5. 补 proactive 检索式关联（不再只靠正则）
+2. ✅ **MyBatis + MySQL**（`db/schema.sql`）
+3. ✅ 用户注册登录（JWT）+ 定时提醒模块
+4. 迁 `apps/web`，features 目录化
+5. 在 `aigateway` 接通 LLM HTTP Client；保留 Heuristic 降级
+6. 补 proactive 检索式关联（不再只靠正则）
 
 ---
 
 ## 9. 选型一句话结论
 
 - **前端：** Next.js + TS + Tailwind + TanStack Query，按 `features/*` 对齐产品能力。  
-- **后端：** Spring Boot 3 + Java 21 + **MyBatis + MySQL**，按同名业务包拆分。  
+- **后端：** Spring Boot 3 + Java 17 + **MyBatis + MySQL**，按同名业务包拆分。  
 - **AI：** 独立 `aigateway`，OpenAI 兼容协议；无 key 时 Heuristic 降级。  
 - **共享：** `packages/contracts` 约束模块边界与 HTTP 路由（Java DTO 手动对齐）。
