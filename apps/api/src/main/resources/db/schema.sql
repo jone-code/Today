@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS memories (
   category VARCHAR(16) NOT NULL,
   memory_text VARCHAR(512) NOT NULL,
   strength INT NOT NULL DEFAULT 1,
+  embedding_json LONGTEXT NULL,
   updated_at DATETIME(3) NOT NULL,
   PRIMARY KEY (id),
   KEY idx_memories_user_strength (user_id, strength DESC, updated_at DESC)

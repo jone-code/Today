@@ -20,7 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class AiGatewayServiceTest {
 
   @Mock AiProperties properties;
-  @Mock OpenAiChatClient chatClient;
+  @Mock OpenAiCompatibleClient client;
   @Mock AiPromptTemplates prompts;
 
   @InjectMocks AiGatewayService gateway;
@@ -38,7 +38,7 @@ class AiGatewayServiceTest {
 
     assertEquals(AiProvider.heuristic, result.provider());
     assertEquals("heuristic", result.data().get("oneLiner"));
-    verify(chatClient, never()).chatJson(anyString(), anyString());
+    verify(client, never()).chatJson(anyString(), anyString());
   }
 
   @Test
@@ -46,8 +46,7 @@ class AiGatewayServiceTest {
     when(properties.isConfigured()).thenReturn(true);
     when(prompts.system(any())).thenReturn("sys");
     when(prompts.user(any(), any())).thenReturn("user");
-    when(chatClient.chatJson("sys", "user"))
-        .thenReturn("{\"oneLiner\":\"来自模型\"}");
+    when(client.chatJson("sys", "user")).thenReturn("{\"oneLiner\":\"来自模型\"}");
 
     var result =
         gateway.complete(
@@ -65,7 +64,7 @@ class AiGatewayServiceTest {
     when(properties.isConfigured()).thenReturn(true);
     when(prompts.system(any())).thenReturn("sys");
     when(prompts.user(any(), any())).thenReturn("user");
-    when(chatClient.chatJson("sys", "user")).thenThrow(new RuntimeException("timeout"));
+    when(client.chatJson("sys", "user")).thenThrow(new RuntimeException("timeout"));
 
     var result =
         gateway.complete(

@@ -269,9 +269,10 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 2. ✅ **MyBatis + MySQL**（`db/schema.sql`）
 3. ✅ 用户注册登录（JWT）+ 定时提醒模块
 4. ✅ 在 `aigateway` 接通 LLM HTTP Client；保留 Heuristic 降级
-5. 迁 `apps/web`，features 目录化
-6. 补 proactive 检索式关联（embedding / 向量，不再只靠正则）
+5. ✅ 补 proactive 检索式关联（embedding + 余弦相似度 Top-K；无向量时按 strength 降级）
+6. 迁 `apps/web`，features 目录化
 7. 慢路径异步化：checkin 先返回 → 后台更新 summary/memory
+8. 向量库外挂（记忆量上来后再考虑）
 
 ---
 

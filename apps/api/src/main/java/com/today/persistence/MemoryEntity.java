@@ -8,6 +8,7 @@ public class MemoryEntity {
   private String category;
   private String memoryText;
   private int strength;
+  private String embeddingJson;
   private Instant updatedAt;
 
   public String getId() {
@@ -48,6 +49,14 @@ public class MemoryEntity {
 
   public void setStrength(int strength) {
     this.strength = strength;
+  }
+
+  public String getEmbeddingJson() {
+    return embeddingJson;
+  }
+
+  public void setEmbeddingJson(String embeddingJson) {
+    this.embeddingJson = embeddingJson;
   }
 
   public Instant getUpdatedAt() {

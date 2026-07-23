@@ -25,6 +25,10 @@ src/main/java/com/today/
 2. 无 key、超时、非 JSON、解析失败 → 自动降级现有 Heuristic
 3. `provider` 字段写入 summary / proactive 响应用于观测
 
+记忆写入时会调用 Embedding API，把向量存入 `memories.embedding_json`；`proactive` 先按近期记录检索 Top-K 相关记忆，再交给 LLM 挑选/润色。无 embedding 时按 `strength` 降级。
+
+已有库请执行：`src/main/resources/db/migration-memory-embedding.sql`
+
 本地无 key 即可完整跑通；接真模型只需设置环境变量后重启 API。
 
 MyBatis XML：`src/main/resources/mapper/**/*.xml`
@@ -66,8 +70,10 @@ npm run dev:api
 | `OPENAI_API_KEY` | — | 有值时走 LLM；为空则 Heuristic |
 | `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI 兼容网关 |
 | `OPENAI_MODEL` | `gpt-4o-mini` | Chat 模型名 |
+| `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding 模型 |
 | `OPENAI_TIMEOUT_MS` | `30000` | 调用超时 |
 | `OPENAI_JSON_RESPONSE_FORMAT` | `true` | 不支持 `response_format` 的网关可设 `false` |
+| `OPENAI_RETRIEVE_TOP_K` | `5` | proactive 记忆检索条数 |
 
 ## 认证
 

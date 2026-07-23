@@ -3,6 +3,8 @@ package com.today.aigateway;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.today.common.AiProvider;
 import com.today.common.JsonUtils;
+import java.util.List;
+import java.util.Optional;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,18 +17,22 @@ public class AiGatewayService {
   private static final Logger log = LoggerFactory.getLogger(AiGatewayService.class);
 
   private final AiProperties properties;
-  private final OpenAiChatClient chatClient;
+  private final OpenAiCompatibleClient client;
   private final AiPromptTemplates prompts;
 
   public AiGatewayService(
-      AiProperties properties, OpenAiChatClient chatClient, AiPromptTemplates prompts) {
+      AiProperties properties, OpenAiCompatibleClient client, AiPromptTemplates prompts) {
     this.properties = properties;
-    this.chatClient = chatClient;
+    this.client = client;
     this.prompts = prompts;
   }
 
   public AiProvider getActiveProvider() {
     return properties.isConfigured() ? AiProvider.llm : AiProvider.heuristic;
+  }
+
+  public int retrieveTopK() {
+    return Math.max(1, properties.getRetrieveTopK());
   }
 
   /**
@@ -42,7 +48,7 @@ public class AiGatewayService {
     try {
       String system = prompts.system(task);
       String user = prompts.user(task, input);
-      String content = chatClient.chatJson(system, user);
+      String content = client.chatJson(system, user);
       String json = JsonUtils.extractJson(content);
       T parsed = JsonUtils.fromJson(json, type);
       if (parsed == null) {
@@ -60,6 +66,27 @@ public class AiGatewayService {
           System.currentTimeMillis() - start,
           e.toString());
       return new AiResult<>(heuristic.get(), AiProvider.heuristic);
+    }
+  }
+
+  /** 批量 embedding；无 key / 失败返回 empty（调用方走 strength 降级检索） */
+  public Optional<List<float[]>> embed(List<String> texts) {
+    if (!properties.isConfigured() || texts == null || texts.isEmpty()) {
+      return Optional.empty();
+    }
+    long start = System.currentTimeMillis();
+    try {
+      List<float[]> vectors = client.embed(texts);
+      log.info(
+          "ai embed ok count={} elapsedMs={}", texts.size(), System.currentTimeMillis() - start);
+      return Optional.of(vectors);
+    } catch (Exception e) {
+      log.warn(
+          "ai embed failed count={} elapsedMs={} reason={}",
+          texts.size(),
+          System.currentTimeMillis() - start,
+          e.toString());
+      return Optional.empty();
     }
   }
 

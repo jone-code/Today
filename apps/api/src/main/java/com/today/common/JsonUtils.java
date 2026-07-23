@@ -48,6 +48,25 @@ public final class JsonUtils {
     }
   }
 
+  public static String toJsonFloatArray(float[] values) {
+    try {
+      return MAPPER.writeValueAsString(values);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("failed to serialize float array", e);
+    }
+  }
+
+  public static float[] fromJsonFloatArray(String json) {
+    if (json == null || json.isBlank()) {
+      return null;
+    }
+    try {
+      return MAPPER.readValue(json, float[].class);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("failed to deserialize float array", e);
+    }
+  }
+
   /** 从模型输出中抽出 JSON 对象/数组（容忍 markdown fence 与前后废话） */
   public static String extractJson(String content) {
     if (content == null) {

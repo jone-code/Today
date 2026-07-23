@@ -13,12 +13,17 @@ public class AiProperties {
 
   private String model = "gpt-4o-mini";
 
+  private String embeddingModel = "text-embedding-3-small";
+
   private int timeoutMs = 30000;
 
   /** 部分兼容网关不支持 response_format，可关 */
   private boolean jsonResponseFormat = true;
 
   private double temperature = 0.3;
+
+  /** proactive 检索返回的记忆条数 */
+  private int retrieveTopK = 5;
 
   public String getApiKey() {
     return apiKey;
@@ -44,6 +49,14 @@ public class AiProperties {
     this.model = model;
   }
 
+  public String getEmbeddingModel() {
+    return embeddingModel;
+  }
+
+  public void setEmbeddingModel(String embeddingModel) {
+    this.embeddingModel = embeddingModel;
+  }
+
   public int getTimeoutMs() {
     return timeoutMs;
   }
@@ -66,6 +79,14 @@ public class AiProperties {
 
   public void setTemperature(double temperature) {
     this.temperature = temperature;
+  }
+
+  public int getRetrieveTopK() {
+    return retrieveTopK;
+  }
+
+  public void setRetrieveTopK(int retrieveTopK) {
+    this.retrieveTopK = retrieveTopK;
   }
 
   public boolean isConfigured() {
