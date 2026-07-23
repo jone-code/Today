@@ -41,6 +41,12 @@ public class SummaryService {
 
   @Transactional
   public DaySummaryDto generateForCheckin(String checkinId, String date, String rawText) {
+    return generateForCheckin(identity.getCurrentUserId(), checkinId, date, rawText);
+  }
+
+  @Transactional
+  public DaySummaryDto generateForCheckin(
+      String userId, String checkinId, String date, String rawText) {
     var result =
         aiGateway.complete(
             AiTask.summary,
@@ -51,7 +57,6 @@ public class SummaryService {
     SummaryPayload payload = normalize(result.data());
     Instant now = EntityMapper.now();
     LocalDate summaryDate = EntityMapper.parseDate(date);
-    String userId = identity.getCurrentUserId();
 
     DaySummaryEntity entity = new DaySummaryEntity();
     entity.setCheckinId(checkinId);

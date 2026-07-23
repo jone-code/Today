@@ -236,7 +236,7 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
   → 次日 / 当日刷新时 proactive.build
 ```
 
-同步 MVP 可串行；体感慢再改为：checkin 先返回 → 后台任务更新 summary/memory → 前端轮询/推送。
+默认异步：checkin 先返回 `status=processing` → 后台任务更新 summary/memory → 前端轮询 `GET /v1/summaries/:date`。`TODAY_AI_ASYNC_CHECKIN=false` 可同步。
 
 ---
 
@@ -270,8 +270,8 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 3. ✅ 用户注册登录（JWT）+ 定时提醒模块
 4. ✅ 在 `aigateway` 接通 LLM HTTP Client；保留 Heuristic 降级
 5. ✅ 补 proactive 检索式关联（embedding + 余弦相似度 Top-K；无向量时按 strength 降级）
-6. 迁 `apps/web`，features 目录化
-7. 慢路径异步化：checkin 先返回 → 后台更新 summary/memory
+6. ✅ 慢路径异步化：checkin 先返回 → 后台更新 summary/memory（可轮询 summary）
+7. 迁 `apps/web`，features 目录化
 8. 向量库外挂（记忆量上来后再考虑）
 
 ---

@@ -25,6 +25,9 @@ public class AiProperties {
   /** proactive 检索返回的记忆条数 */
   private int retrieveTopK = 5;
 
+  /** checkin 提交后是否异步跑 summary/memory（关闭则同步，便于本地调试） */
+  private boolean asyncCheckin = true;
+
   public String getApiKey() {
     return apiKey;
   }
@@ -87,6 +90,14 @@ public class AiProperties {
 
   public void setRetrieveTopK(int retrieveTopK) {
     this.retrieveTopK = retrieveTopK;
+  }
+
+  public boolean isAsyncCheckin() {
+    return asyncCheckin;
+  }
+
+  public void setAsyncCheckin(boolean asyncCheckin) {
+    this.asyncCheckin = asyncCheckin;
   }
 
   public boolean isConfigured() {

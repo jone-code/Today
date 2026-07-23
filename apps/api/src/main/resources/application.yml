@@ -29,3 +29,4 @@ today:
     json-response-format: ${OPENAI_JSON_RESPONSE_FORMAT:true}
     temperature: ${OPENAI_TEMPERATURE:0.3}
     retrieve-top-k: ${OPENAI_RETRIEVE_TOP_K:5}
+    async-checkin: ${TODAY_AI_ASYNC_CHECKIN:true}

@@ -1,5 +1,6 @@
 export * from "./common";
 export * from "./checkin";
+export * from "./checkin-submit";
 export * from "./summary";
 export * from "./memory";
 export * from "./timeline";

@@ -22,6 +22,7 @@ import {
   apiGetTimeline,
   apiGetTodayCheckin,
   apiPostCheckin,
+  apiWaitForSummary,
   getAuthToken,
   type CheckinDto,
   type DaySummaryDto,
@@ -54,13 +55,27 @@ function mapSummaryDtoToDaySummary(summary: DaySummaryDto): DayEntry["summary"] 
   };
 }
 
-function mapCheckinDtoToDayEntry(checkin: CheckinDto, summary: DaySummaryDto): DayEntry {
+function pendingSummary(): DayEntry["summary"] {
+  return {
+    completed: [],
+    mood: "okay",
+    moodLabel: "整理中",
+    keywords: [],
+    oneLiner: "正在整理今天，马上就好…",
+    highlight: "正在整理",
+  };
+}
+
+function mapCheckinDtoToDayEntry(
+  checkin: CheckinDto,
+  summary: DaySummaryDto | null,
+): DayEntry {
   return {
     id: checkin.id,
     date: checkin.date,
     rawText: checkin.rawText,
     createdAt: checkin.createdAt,
-    summary: mapSummaryDtoToDaySummary(summary),
+    summary: summary ? mapSummaryDtoToDaySummary(summary) : pendingSummary(),
   };
 }
 
@@ -114,8 +129,17 @@ async function tryLoadFromApi() {
 
   let todayEntry: DayEntry | null = null;
   if (checkinRes.checkin) {
-    const summary = await apiGetSummaryByDate(checkinRes.checkin.date);
-    todayEntry = mapCheckinDtoToDayEntry(checkinRes.checkin, summary);
+    try {
+      const summary = await apiGetSummaryByDate(checkinRes.checkin.date);
+      todayEntry = mapCheckinDtoToDayEntry(checkinRes.checkin, summary);
+    } catch (e) {
+      const status = (e as Error & { status?: number }).status;
+      if (status === 404) {
+        todayEntry = mapCheckinDtoToDayEntry(checkinRes.checkin, null);
+      } else {
+        throw e;
+      }
+    }
   }
 
   return { entries, memories, todayEntry, prompts } as const;
@@ -173,7 +197,13 @@ export function TodayProvider({ children }: { children: ReactNode }) {
 
     if (mode === "api") {
       const res = await apiPostCheckin(trimmed);
-      const entry = mapCheckinDtoToDayEntry(res.checkin, res.summary);
+      let summary = res.summary;
+      if (res.status === "processing" || !summary) {
+        // 先展示占位，再等后台 summary 就绪
+        setTodayEntry(mapCheckinDtoToDayEntry(res.checkin, null));
+        summary = await apiWaitForSummary(res.checkin.date);
+      }
+      const entry = mapCheckinDtoToDayEntry(res.checkin, summary);
 
       // refresh the rest for consistency
       const [timelineRes, memoriesRes, proactiveRes] = await Promise.all([

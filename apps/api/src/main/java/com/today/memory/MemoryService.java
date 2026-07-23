@@ -79,6 +79,11 @@ public class MemoryService {
 
   @Transactional
   public List<MemoryDto> upsertFromCheckin(String rawText) {
+    return upsertFromCheckin(identity.getCurrentUserId(), rawText);
+  }
+
+  @Transactional
+  public List<MemoryDto> upsertFromCheckin(String userId, String rawText) {
     var result =
         aiGateway.complete(
             AiTask.memory_extract,
@@ -86,7 +91,6 @@ public class MemoryService {
             EXTRACT_TYPE,
             () -> new MemoryExtractPayload(heuristicExtract(rawText)));
 
-    String userId = identity.getCurrentUserId();
     Instant now = EntityMapper.now();
     List<MemoryCandidate> items =
         result.data() == null || result.data().items() == null
@@ -125,7 +129,7 @@ public class MemoryService {
     }
 
     backfillEmbeddings(needEmbed, now);
-    return list();
+    return memoryMapper.listByUserId(userId).stream().map(EntityMapper::toDto).toList();
   }
 
   private void backfillEmbeddings(List<MemoryEntity> entities, Instant now) {

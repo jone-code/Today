@@ -194,12 +194,36 @@ export async function apiGetSummaryByDate(date: string): Promise<DaySummaryDto> 
 
 export async function apiPostCheckin(rawText: string): Promise<{
   checkin: CheckinDto;
-  summary: DaySummaryDto;
+  summary: DaySummaryDto | null;
+  status: "processing" | "ready";
 }> {
   return requestJson("/v1/checkins", {
     method: "POST",
     body: JSON.stringify({ rawText }),
   });
+}
+
+/** 轮询直到 summary 就绪（async checkin 后） */
+export async function apiWaitForSummary(
+  date: string,
+  opts?: { attempts?: number; intervalMs?: number },
+): Promise<DaySummaryDto> {
+  const attempts = opts?.attempts ?? 40;
+  const intervalMs = opts?.intervalMs ?? 750;
+  let lastError: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await apiGetSummaryByDate(date);
+    } catch (e) {
+      lastError = e;
+      const status = (e as Error & { status?: number }).status;
+      if (status !== 404) throw e;
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("summary not ready after polling");
 }
 
 export async function apiGetMemories(): Promise<{ items: MemoryDto[] }> {
