@@ -123,4 +123,4 @@ npm run dev:web
 - Web: [http://localhost:3000](http://localhost:3000)（`/login` `/register` `/app` `/app/reminders`）
 - API health: [http://localhost:3001/health](http://localhost:3001/health)
 
-当前状态：**注册登录（JWT）与定时提醒已落地**；AI 仍为 Heuristic 降级；未登录时前端可本地 fallback。
+当前状态：**注册登录（JWT）与定时提醒已落地**；`aigateway` 已接通 OpenAI 兼容 LLM（无 key / 失败时 Heuristic 降级）；未登录时前端可本地 fallback。

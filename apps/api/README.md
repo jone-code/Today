@@ -11,10 +11,21 @@ src/main/java/com/today/
   memory/       长期记忆
   timeline/     时间轴
   proactive/    主动关联
-  aigateway/    模型抽象
-  identity/     用户占位
+  aigateway/    模型抽象（OpenAI 兼容 + Heuristic 降级）
+  identity/     用户认证
+  reminder/     定时提醒
   persistence/  数据库实体
 ```
+
+## AI Gateway
+
+`summary` / `memory` / `proactive` 均经 `AiGatewayService.complete`：
+
+1. 配置了 `OPENAI_API_KEY` → 调 OpenAI 兼容 Chat Completions，要求结构化 JSON
+2. 无 key、超时、非 JSON、解析失败 → 自动降级现有 Heuristic
+3. `provider` 字段写入 summary / proactive 响应用于观测
+
+本地无 key 即可完整跑通；接真模型只需设置环境变量后重启 API。
 
 MyBatis XML：`src/main/resources/mapper/**/*.xml`
 
@@ -52,7 +63,11 @@ npm run dev:api
 | `MYSQL_PASSWORD` | `today` | 数据库密码 |
 | `TODAY_JWT_SECRET` | 开发默认值（请更换） | JWT 签名密钥，至少 32 字节 |
 | `TODAY_JWT_EXPIRE_HOURS` | `168` | Token 有效小时数 |
-| `OPENAI_API_KEY` | — | 有值时走 LLM（尚未接通） |
+| `OPENAI_API_KEY` | — | 有值时走 LLM；为空则 Heuristic |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI 兼容网关 |
+| `OPENAI_MODEL` | `gpt-4o-mini` | Chat 模型名 |
+| `OPENAI_TIMEOUT_MS` | `30000` | 调用超时 |
+| `OPENAI_JSON_RESPONSE_FORMAT` | `true` | 不支持 `response_format` 的网关可设 `false` |
 
 ## 认证
 

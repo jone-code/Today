@@ -1,5 +1,6 @@
 package com.today.proactive;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.today.aigateway.AiGatewayService;
 import com.today.aigateway.AiGatewayService.AiTask;
 import com.today.checkin.CheckinDto;
@@ -8,14 +9,17 @@ import com.today.common.PromptSource;
 import com.today.memory.MemoryDto;
 import com.today.memory.MemoryService;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 
 @Service
 public class ProactiveService {
+
+  private static final TypeReference<ProactivePayload> PROACTIVE_TYPE =
+      new TypeReference<>() {};
 
   private final AiGatewayService aiGateway;
   private final CheckinService checkins;
@@ -33,18 +37,43 @@ public class ProactiveService {
     List<CheckinDto> recent = checkins.listRecent(14);
     List<MemoryDto> memoryList = memories.list();
 
+    Map<String, Object> input = new HashMap<>();
+    input.put("date", date);
+    input.put("recent", recent);
+    input.put("memories", memoryList);
+
     var result =
         aiGateway.complete(
             AiTask.proactive,
-            Map.of("recent", recent, "memories", memoryList),
-            () -> heuristicPrompts(date, recent, memoryList));
+            input,
+            PROACTIVE_TYPE,
+            () -> new ProactivePayload(heuristicPrompts(date, recent, memoryList)));
 
-    List<ProactivePromptDto> prompts = result.data();
-    if (prompts.size() > 3) {
-      prompts = prompts.subList(0, 3);
+    List<ProactivePromptDto> prompts =
+        result.data() == null || result.data().prompts() == null
+            ? List.of()
+            : result.data().prompts().stream()
+                .filter(p -> p != null && p.text() != null && !p.text().isBlank())
+                .map(this::normalizePrompt)
+                .limit(3)
+                .toList();
+
+    if (prompts.isEmpty()) {
+      prompts = heuristicPrompts(date, recent, memoryList);
     }
 
     return new ProactiveTodayDto(date, prompts, result.provider());
+  }
+
+  private ProactivePromptDto normalizePrompt(ProactivePromptDto p) {
+    String id =
+        p.id() == null || p.id().isBlank()
+            ? "prompt-" + Integer.toHexString(p.text().hashCode())
+            : p.id().trim();
+    PromptSource source = p.source() == null ? PromptSource.gentle : p.source();
+    String related =
+        p.relatedDate() == null || p.relatedDate().isBlank() ? null : p.relatedDate().trim();
+    return new ProactivePromptDto(id, p.text().trim(), related, source);
   }
 
   private List<ProactivePromptDto> heuristicPrompts(
@@ -103,4 +132,6 @@ public class ProactiveService {
 
     return prompts;
   }
+
+  public record ProactivePayload(List<ProactivePromptDto> prompts) {}
 }

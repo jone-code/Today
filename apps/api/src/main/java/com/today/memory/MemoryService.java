@@ -1,5 +1,6 @@
 package com.today.memory;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.today.aigateway.AiGatewayService;
 import com.today.aigateway.AiGatewayService.AiTask;
 import com.today.common.EntityMapper;
@@ -15,6 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class MemoryService {
+
+  private static final TypeReference<MemoryExtractPayload> EXTRACT_TYPE =
+      new TypeReference<>() {};
 
   private final MemoryMapper memoryMapper;
   private final AiGatewayService aiGateway;
@@ -39,20 +43,30 @@ public class MemoryService {
         aiGateway.complete(
             AiTask.memory_extract,
             Map.of("rawText", rawText),
-            () -> heuristicExtract(rawText));
+            EXTRACT_TYPE,
+            () -> new MemoryExtractPayload(heuristicExtract(rawText)));
 
     String userId = identity.getCurrentUserId();
     Instant now = EntityMapper.now();
+    List<MemoryCandidate> items =
+        result.data() == null || result.data().items() == null
+            ? List.of()
+            : result.data().items().stream()
+                .filter(i -> i != null && i.text() != null && !i.text().isBlank())
+                .filter(i -> i.category() != null)
+                .limit(5)
+                .toList();
 
-    for (MemoryCandidate item : result.data()) {
-      String id = userId + ":" + item.category().name() + ":" + item.text();
+    for (MemoryCandidate item : items) {
+      String text = item.text().trim();
+      String id = userId + ":" + item.category().name() + ":" + text;
       MemoryEntity existing = memoryMapper.findById(id);
       if (existing == null) {
         MemoryEntity created = new MemoryEntity();
         created.setId(id);
         created.setUserId(userId);
         created.setCategory(item.category().name());
-        created.setMemoryText(item.text());
+        created.setMemoryText(text);
         created.setStrength(1);
         created.setUpdatedAt(now);
         memoryMapper.insert(created);
@@ -89,5 +103,7 @@ public class MemoryService {
     return out;
   }
 
-  private record MemoryCandidate(MemoryCategory category, String text) {}
+  public record MemoryExtractPayload(List<MemoryCandidate> items) {}
+
+  public record MemoryCandidate(MemoryCategory category, String text) {}
 }
