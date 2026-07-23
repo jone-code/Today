@@ -86,6 +86,8 @@ apps/api/src/main/java/com/today/
 ├── aigateway/
 ├── identity/
 ├── reminder/
+├── todo/
+├── punch/
 └── health/
 ```
 
@@ -223,6 +225,25 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 - **数据：** `reminders`、`reminder_deliveries`
 - **调度：** `@Scheduled` 每分钟扫描到期提醒并写入投递。
 
+
+#### `todo` — 待办
+
+- **负责：** 待办创建、完成/重开、删除。
+- **核心 API：**
+  - `GET/POST /v1/todos`
+  - `PUT/DELETE /v1/todos/:id`
+  - `POST /v1/todos/:id/toggle`
+- **数据：** `todos`
+
+#### `punch` — 习惯打卡
+
+- **负责：** 习惯管理、当日打卡/取消、连续天数。
+- **核心 API：**
+  - `GET/POST /v1/punch/habits`
+  - `PUT/DELETE /v1/punch/habits/:id`
+  - `POST/DELETE /v1/punch/habits/:id/punch`
+- **数据：** `punch_habits`、`punch_logs`
+
 ---
 
 ## 5. 关键链路（提交一天）
@@ -253,13 +274,17 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 - `ProactivePromptDto`
 - `Auth*` / `UserDto`
 - `ReminderDto` / `ReminderDeliveryDto`
+- `TodoDto`
+- `PunchHabitDto` / `PunchLogDto`
 - 统一 `ApiError`
 
 ---
 
-## 7. 明确不做（与产品一致，防模块膨胀）
+## 7. 明确不做（当前阶段）
 
-社区、好友、评论、分享、复杂统计、AI 绘图、心理咨询、目标/Todo、打卡排行 —— **不建模块、不建表**。
+社区、好友、评论、分享、复杂统计、AI 绘图、心理咨询、打卡排行榜 —— **暂不建**。
+
+> 说明：Todo / 习惯打卡已按产品优先级落地；AI 能力先保持轻量。
 
 ---
 
@@ -268,9 +293,10 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 1. ✅ `packages/contracts` + Spring Boot 模块骨架（checkin/summary/memory/timeline/proactive/aigateway）
 2. ✅ **MyBatis + MySQL**（`db/schema.sql`）
 3. ✅ 用户注册登录（JWT）+ 定时提醒模块
-4. 迁 `apps/web`，features 目录化
-5. 在 `aigateway` 接通 LLM HTTP Client；保留 Heuristic 降级
-6. 补 proactive 检索式关联（不再只靠正则）
+4. ✅ Todo + 打卡（优先于加厚 AI）
+5. 迁 `apps/web`，features 目录化
+6. 在 `aigateway` 接通 LLM HTTP Client；保留 Heuristic 降级
+7. 补 proactive 检索式关联（不再只靠正则）
 
 ---
 

@@ -71,6 +71,8 @@ npm run dev:api
 
 调度器每分钟扫描一次到期提醒，写入 `reminder_deliveries`。
 
-若数据库已初始化，请执行 `src/main/resources/db/migration-auth-reminder.sql`。
+若数据库已初始化，请执行：
+1. `src/main/resources/db/migration-auth-reminder.sql`
+2. `src/main/resources/db/migration-todo-punch.sql`
 
 表结构完整版见 `src/main/resources/db/schema.sql`。

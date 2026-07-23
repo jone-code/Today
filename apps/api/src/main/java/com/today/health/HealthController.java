@@ -23,6 +23,8 @@ public class HealthController {
                 "proactive",
                 "ai-gateway",
                 "identity",
-                "reminder"));
+                "reminder",
+                "todo",
+                "punch"));
   }
 }
