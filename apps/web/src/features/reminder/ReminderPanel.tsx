@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   apiCreateReminder,
   apiDeleteReminder,
@@ -8,53 +9,65 @@ import {
   apiListReminders,
   apiMarkReminderDeliveryRead,
   apiUpdateReminder,
-  type ReminderDeliveryDto,
   type ReminderDto,
 } from "@/shared/lib/api-client";
 import { useAuth } from "@/shared/lib/auth-context";
+import { reminderKeys } from "@/shared/lib/query-keys";
 import Link from "next/link";
 
 export function ReminderPanel() {
   const { user, ready } = useAuth();
-  const [items, setItems] = useState<ReminderDto[] | null>(null);
-  const [deliveries, setDeliveries] = useState<ReminderDeliveryDto[]>([]);
+  const queryClient = useQueryClient();
   const [title, setTitle] = useState("留下今天");
   const [message, setMessage] = useState("今天过得怎么样？花 30 秒记下来。");
   const [remindTime, setRemindTime] = useState("21:00");
-  const [error, setError] = useState("");
+  const [formError, setFormError] = useState("");
 
-  const refresh = async () => {
-    const [reminders, deliveryList] = await Promise.all([
-      apiListReminders(),
-      apiListReminderDeliveries(20),
-    ]);
-    setItems(reminders.items);
-    setDeliveries(deliveryList.items);
+  const enabled = ready && !!user;
+
+  const remindersQuery = useQuery({
+    queryKey: reminderKeys.list(),
+    queryFn: async () => (await apiListReminders()).items,
+    enabled,
+  });
+
+  const deliveriesQuery = useQuery({
+    queryKey: reminderKeys.deliveries(20),
+    queryFn: async () => (await apiListReminderDeliveries(20)).items,
+    enabled,
+  });
+
+  const invalidate = async () => {
+    await queryClient.invalidateQueries({ queryKey: reminderKeys.all });
   };
 
-  useEffect(() => {
-    if (!ready || !user) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const [reminders, deliveryList] = await Promise.all([
-          apiListReminders(),
-          apiListReminderDeliveries(20),
-        ]);
-        if (cancelled) return;
-        setItems(reminders.items);
-        setDeliveries(deliveryList.items);
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "加载失败");
-          setItems([]);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [ready, user]);
+  const createMutation = useMutation({
+    mutationFn: () =>
+      apiCreateReminder({
+        title: title.trim(),
+        message: message.trim(),
+        remindTime,
+        timezone: "Asia/Shanghai",
+        enabled: true,
+      }),
+    onSuccess: invalidate,
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: (item: ReminderDto) =>
+      apiUpdateReminder(item.id, { enabled: !item.enabled }),
+    onSuccess: invalidate,
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (id: string) => apiDeleteReminder(id),
+    onSuccess: invalidate,
+  });
+
+  const markReadMutation = useMutation({
+    mutationFn: (id: string) => apiMarkReminderDeliveryRead(id),
+    onSuccess: invalidate,
+  });
 
   if (!ready) {
     return <p className="muted loading-line">正在读取提醒…</p>;
@@ -71,40 +84,25 @@ export function ReminderPanel() {
     );
   }
 
-  if (items === null) {
+  if (remindersQuery.isLoading || deliveriesQuery.isLoading) {
     return <p className="muted loading-line">正在读取提醒…</p>;
   }
 
+  const items = remindersQuery.data ?? [];
+  const deliveries = deliveriesQuery.data ?? [];
+  const error =
+    formError ||
+    (remindersQuery.error instanceof Error ? remindersQuery.error.message : "") ||
+    (deliveriesQuery.error instanceof Error ? deliveriesQuery.error.message : "");
+
   const onCreate = async (e: FormEvent) => {
     e.preventDefault();
-    setError("");
+    setFormError("");
     try {
-      await apiCreateReminder({
-        title: title.trim(),
-        message: message.trim(),
-        remindTime,
-        timezone: "Asia/Shanghai",
-        enabled: true,
-      });
-      await refresh();
+      await createMutation.mutateAsync();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "创建失败");
+      setFormError(err instanceof Error ? err.message : "创建失败");
     }
-  };
-
-  const toggle = async (item: ReminderDto) => {
-    await apiUpdateReminder(item.id, { enabled: !item.enabled });
-    await refresh();
-  };
-
-  const remove = async (id: string) => {
-    await apiDeleteReminder(id);
-    await refresh();
-  };
-
-  const markRead = async (id: string) => {
-    await apiMarkReminderDeliveryRead(id);
-    await refresh();
   };
 
   return (
@@ -135,8 +133,8 @@ export function ReminderPanel() {
           />
         </label>
         {error ? <p className="form-error">{error}</p> : null}
-        <button type="submit" className="btn-primary">
-          保存提醒
+        <button type="submit" className="btn-primary" disabled={createMutation.isPending}>
+          {createMutation.isPending ? "保存中…" : "保存提醒"}
         </button>
       </form>
 
@@ -157,10 +155,18 @@ export function ReminderPanel() {
                   <p>{item.message}</p>
                 </div>
                 <div className="reminder-actions">
-                  <button type="button" className="text-btn" onClick={() => toggle(item)}>
+                  <button
+                    type="button"
+                    className="text-btn"
+                    onClick={() => toggleMutation.mutate(item)}
+                  >
                     {item.enabled ? "暂停" : "开启"}
                   </button>
-                  <button type="button" className="text-btn" onClick={() => remove(item.id)}>
+                  <button
+                    type="button"
+                    className="text-btn"
+                    onClick={() => removeMutation.mutate(item.id)}
+                  >
                     删除
                   </button>
                 </div>
@@ -186,7 +192,11 @@ export function ReminderPanel() {
                   <p>{d.message}</p>
                 </div>
                 {d.status === "pending" ? (
-                  <button type="button" className="text-btn" onClick={() => markRead(d.id)}>
+                  <button
+                    type="button"
+                    className="text-btn"
+                    onClick={() => markReadMutation.mutate(d.id)}
+                  >
                     标为已读
                   </button>
                 ) : null}

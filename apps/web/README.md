@@ -38,5 +38,6 @@ npm run dev -w @today/web
 ## 规则
 
 - `features/*` 只通过 HTTP 调 `apps/api`，不内嵌模型 SDK
-- 契约优先从 `@today/contracts` 对齐；HTTP 客户端暂在 `shared/lib/api-client.ts`
-- 未登录时仍可用本地 storage + heuristic 降级（demo）
+- 契约优先从 `@today/contracts` 对齐；HTTP 客户端在 `shared/lib/api-client.ts`
+- 数据请求经 **TanStack Query**（`today` / `reminders` query keys）
+- 默认需登录走 API；仅当 `NEXT_PUBLIC_ALLOW_LOCAL_FALLBACK=true` 时允许未登录本地 demo

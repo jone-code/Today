@@ -123,4 +123,4 @@ npm run dev:web
 - Web: [http://localhost:3000](http://localhost:3000)（`/login` `/register` `/app` `/app/reminders`）
 - API health: [http://localhost:3001/health](http://localhost:3001/health)
 
-当前状态：**前端已迁入 `apps/web`**；注册登录（JWT）与定时提醒已落地；`aigateway` 已接通 OpenAI 兼容 LLM + Embedding 检索（无 key / 失败时 Heuristic 降级）；未登录时前端可本地 fallback。
+当前状态：**前端已迁入 `apps/web` 并接入 TanStack Query**；默认强制登录走 API（本地 fallback 需显式开启）；`aigateway` 已接通 OpenAI 兼容 LLM + Embedding 检索；checkin AI 流水线异步。

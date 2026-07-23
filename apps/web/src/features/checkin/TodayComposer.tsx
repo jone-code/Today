@@ -1,15 +1,17 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { ProactivePromptList } from "@/features/proactive/ProactivePromptList";
 import { SummaryBlock } from "@/features/summary/SummaryBlock";
 import { useToday } from "@/shared/lib/today-context";
 
 export function TodayComposer() {
-  const { todayEntry, prompts, saveToday, ready } = useToday();
+  const { todayEntry, prompts, saveToday, ready, mode, error } = useToday();
   const [text, setText] = useState("");
   const [justSaved, setJustSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -18,13 +20,14 @@ export function TodayComposer() {
     setJustSaved(true);
     setText("");
     setSaving(true);
+    setSaveError("");
 
     try {
       await saveToday(payload);
-    } catch {
-      // 失败时回滚编辑状态（demo 场景）
+    } catch (err) {
       setJustSaved(false);
       setText(payload);
+      setSaveError(err instanceof Error ? err.message : "保存失败");
     } finally {
       setSaving(false);
     }
@@ -32,6 +35,21 @@ export function TodayComposer() {
 
   if (!ready) {
     return <p className="muted loading-line">正在唤醒记忆…</p>;
+  }
+
+  if (mode === "guest") {
+    return (
+      <div className="empty-state reveal">
+        <p>登录后，Today 才能真正记住你的每一天。</p>
+        <p className="muted">
+          <Link href="/login">登录</Link> 或 <Link href="/register">注册</Link>
+        </p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return <p className="form-error">{error}</p>;
   }
 
   if (todayEntry && !justSaved && text.length === 0) {
@@ -71,8 +89,11 @@ export function TodayComposer() {
           rows={5}
           maxLength={2000}
         />
+        {saveError ? <p className="form-error">{saveError}</p> : null}
         <div className="composer-actions">
-          <span className="hint">大约 30 秒就够</span>
+          <span className="hint">
+            {mode === "local" ? "本地演示模式" : "大约 30 秒就够"}
+          </span>
           <button type="submit" disabled={!text.trim() || saving}>
             {saving ? "记住中…" : "留下今天"}
           </button>

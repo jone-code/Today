@@ -40,7 +40,7 @@ today/
 |----|------|------|
 | 框架 | **Next.js（App Router）+ TypeScript** | 已有基础；SSR/落地页 + App 内交互都合适 |
 | 样式 | **Tailwind CSS** | 迭代快，适合品牌向 UI |
-| 数据请求 | fetch + context（TanStack Query 可后续加） | MVP 先简单；缓存策略可再升级 |
+| 数据请求 | **TanStack Query** | 今日态 / 提醒缓存与失效；默认走 API |
 | 表单 | 原生 + 小组件即可 | MVP 只有一个主输入，不必上重型表单库 |
 | 鉴权 | JWT（Bearer）+ 本地 token | 与 `apps/api` identity 对齐 |
 
@@ -273,8 +273,9 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 5. ✅ 补 proactive 检索式关联（embedding + 余弦相似度 Top-K；无向量时按 strength 降级）
 6. ✅ 慢路径异步化：checkin 先返回 → 后台更新 summary/memory（可轮询 summary）
 7. ✅ 迁 `apps/web`，features 目录化
-8. 接入 TanStack Query；逐步去掉本地 heuristic fallback（强制走 API）
+8. ✅ 接入 TanStack Query；默认强制走 API（本地 fallback 需 `NEXT_PUBLIC_ALLOW_LOCAL_FALLBACK=true`）
 9. 向量库外挂（记忆量上来后再考虑）
+10. Todo / 打卡合入 `apps/web` features（若保留该产品线）
 
 ---
 

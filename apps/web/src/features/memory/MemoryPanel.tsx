@@ -12,10 +12,18 @@ const categoryLabel = {
 } as const;
 
 export function MemoryPanel() {
-  const { memories, ready, entries } = useToday();
+  const { memories, ready, entries, mode } = useToday();
 
   if (!ready) {
     return <p className="muted loading-line">正在整理长期记忆…</p>;
+  }
+
+  if (mode === "guest") {
+    return (
+      <div className="empty-state reveal">
+        <p>登录后才能查看长期记忆。</p>
+      </div>
+    );
   }
 
   if (memories.length === 0) {

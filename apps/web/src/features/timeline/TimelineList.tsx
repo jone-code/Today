@@ -5,10 +5,18 @@ import { formatDisplayDate } from "@/shared/lib/storage";
 import { useToday } from "@/shared/lib/today-context";
 
 export function TimelineList() {
-  const { entries, ready } = useToday();
+  const { entries, ready, mode } = useToday();
 
   if (!ready) {
     return <p className="muted loading-line">正在展开时间轴…</p>;
+  }
+
+  if (mode === "guest") {
+    return (
+      <div className="empty-state reveal">
+        <p>登录后才能查看时间轴。</p>
+      </div>
+    );
   }
 
   if (entries.length === 0) {
