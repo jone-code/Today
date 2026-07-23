@@ -1,0 +1,264 @@
+"use client";
+
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  buildProactivePrompts,
+  summarizeToday,
+  updateMemoriesFromEntry,
+} from "@/shared/lib/ai";
+import {
+  loadEntries,
+  loadMemories,
+  saveEntries,
+  saveMemories,
+  todayKey,
+  upsertTodayEntry,
+} from "@/shared/lib/storage";
+import type { DayEntry, MemoryItem, ProactivePrompt } from "@/shared/lib/types";
+import {
+  apiGetMemories,
+  apiGetProactiveToday,
+  apiGetSummaryByDate,
+  apiGetTimeline,
+  apiGetTodayCheckin,
+  apiPostCheckin,
+  apiWaitForSummary,
+  getAuthToken,
+  type CheckinDto,
+  type DaySummaryDto,
+  type MemoryDto,
+  type ProactivePromptDto,
+  type TimelineItemDto,
+} from "@/shared/lib/api-client";
+
+type TodayContextValue = {
+  ready: boolean;
+  entries: DayEntry[];
+  memories: MemoryItem[];
+  todayEntry: DayEntry | null;
+  prompts: ProactivePrompt[];
+  saveToday: (rawText: string) => Promise<DayEntry>;
+};
+
+const TodayContext = createContext<TodayContextValue | null>(null);
+
+type Mode = "api" | "local";
+
+function mapSummaryDtoToDaySummary(summary: DaySummaryDto): DayEntry["summary"] {
+  return {
+    completed: summary.completed,
+    mood: summary.mood,
+    moodLabel: summary.moodLabel,
+    keywords: summary.keywords,
+    oneLiner: summary.oneLiner,
+    highlight: summary.highlight,
+  };
+}
+
+function pendingSummary(): DayEntry["summary"] {
+  return {
+    completed: [],
+    mood: "okay",
+    moodLabel: "整理中",
+    keywords: [],
+    oneLiner: "正在整理今天，马上就好…",
+    highlight: "正在整理",
+  };
+}
+
+function mapCheckinDtoToDayEntry(
+  checkin: CheckinDto,
+  summary: DaySummaryDto | null,
+): DayEntry {
+  return {
+    id: checkin.id,
+    date: checkin.date,
+    rawText: checkin.rawText,
+    createdAt: checkin.createdAt,
+    summary: summary ? mapSummaryDtoToDaySummary(summary) : pendingSummary(),
+  };
+}
+
+function mapTimelineItemToDayEntry(item: TimelineItemDto): DayEntry {
+  return {
+    id: item.checkinId,
+    date: item.date,
+    rawText: "",
+    createdAt: "",
+    summary: {
+      completed: [],
+      mood: item.mood,
+      moodLabel: item.moodLabel,
+      keywords: [],
+      oneLiner: item.oneLiner,
+      highlight: item.highlight,
+    },
+  };
+}
+
+function mapMemoryDtoToMemoryItem(m: MemoryDto): MemoryItem {
+  return {
+    id: m.id,
+    text: m.text,
+    category: m.category,
+    strength: m.strength,
+    updatedAt: m.updatedAt,
+  };
+}
+
+function mapPromptDtoToPrompt(p: ProactivePromptDto): ProactivePrompt {
+  const relatedDate =
+    p.relatedDate && typeof p.relatedDate === "string" ? p.relatedDate : undefined;
+  return { id: p.id, text: p.text, relatedDate };
+}
+
+async function tryLoadFromApi() {
+  if (!getAuthToken()) {
+    throw new Error("no auth token");
+  }
+  const checkinRes = await apiGetTodayCheckin();
+  const [timelineRes, memoriesRes, proactiveRes] = await Promise.all([
+    apiGetTimeline(30),
+    apiGetMemories(),
+    apiGetProactiveToday(),
+  ]);
+
+  const entries = timelineRes.items.map(mapTimelineItemToDayEntry).sort((a, b) => b.date.localeCompare(a.date));
+  const memories = memoriesRes.items.map(mapMemoryDtoToMemoryItem);
+  const prompts = proactiveRes.prompts.map(mapPromptDtoToPrompt);
+
+  let todayEntry: DayEntry | null = null;
+  if (checkinRes.checkin) {
+    try {
+      const summary = await apiGetSummaryByDate(checkinRes.checkin.date);
+      todayEntry = mapCheckinDtoToDayEntry(checkinRes.checkin, summary);
+    } catch (e) {
+      const status = (e as Error & { status?: number }).status;
+      if (status === 404) {
+        todayEntry = mapCheckinDtoToDayEntry(checkinRes.checkin, null);
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  return { entries, memories, todayEntry, prompts } as const;
+}
+
+function loadFromLocal() {
+  const entries = loadEntries();
+  const memories = loadMemories();
+  const todayEntry = entries.find((e) => e.date === todayKey()) ?? null;
+  const prompts = buildProactivePrompts(entries, memories);
+  return { entries, memories, todayEntry, prompts } as const;
+}
+
+export function TodayProvider({ children }: { children: ReactNode }) {
+  const [ready, setReady] = useState(false);
+  const [mode, setMode] = useState<Mode>("local");
+  const [entries, setEntries] = useState<DayEntry[]>([]);
+  const [memories, setMemories] = useState<MemoryItem[]>([]);
+  const [todayEntry, setTodayEntry] = useState<DayEntry | null>(null);
+  const [prompts, setPrompts] = useState<ProactivePrompt[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const loaded = await tryLoadFromApi();
+        if (cancelled) return;
+        setMode("api");
+        setEntries(loaded.entries);
+        setMemories(loaded.memories);
+        setTodayEntry(loaded.todayEntry);
+        setPrompts(loaded.prompts);
+      } catch {
+        if (cancelled) return;
+        const loaded = loadFromLocal();
+        setMode("local");
+        setEntries(loaded.entries);
+        setMemories(loaded.memories);
+        setTodayEntry(loaded.todayEntry);
+        setPrompts(loaded.prompts);
+      } finally {
+        if (!cancelled) setReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const saveToday = async (rawText: string) => {
+    const trimmed = rawText.trim();
+    if (!trimmed) {
+      throw new Error("rawText is empty");
+    }
+
+    if (mode === "api") {
+      const res = await apiPostCheckin(trimmed);
+      let summary = res.summary;
+      if (res.status === "processing" || !summary) {
+        // 先展示占位，再等后台 summary 就绪
+        setTodayEntry(mapCheckinDtoToDayEntry(res.checkin, null));
+        summary = await apiWaitForSummary(res.checkin.date);
+      }
+      const entry = mapCheckinDtoToDayEntry(res.checkin, summary);
+
+      // refresh the rest for consistency
+      const [timelineRes, memoriesRes, proactiveRes] = await Promise.all([
+        apiGetTimeline(30),
+        apiGetMemories(),
+        apiGetProactiveToday(),
+      ]);
+
+      setTodayEntry(entry);
+      setEntries(timelineRes.items.map(mapTimelineItemToDayEntry).sort((a, b) => b.date.localeCompare(a.date)));
+      setMemories(memoriesRes.items.map(mapMemoryDtoToMemoryItem));
+      setPrompts(proactiveRes.prompts.map(mapPromptDtoToPrompt));
+      return entry;
+    }
+
+    // local fallback
+    const date = todayKey();
+    const summary = summarizeToday(trimmed);
+    const entry: DayEntry = {
+      id: `${date}-${Date.now()}`,
+      date,
+      rawText: trimmed,
+      createdAt: new Date().toISOString(),
+      summary,
+    };
+
+    const nextEntries = upsertTodayEntry(entries, entry);
+    const nextMemories = updateMemoriesFromEntry(memories, entry);
+    setEntries(nextEntries);
+    setMemories(nextMemories);
+    saveEntries(nextEntries);
+    saveMemories(nextMemories);
+
+    // prompts depend on both
+    setPrompts(buildProactivePrompts(nextEntries, nextMemories));
+    setTodayEntry(entry);
+    return entry;
+  };
+
+  const value: TodayContextValue = {
+    ready,
+    entries,
+    memories,
+    todayEntry,
+    prompts,
+    saveToday,
+  };
+
+  return <TodayContext.Provider value={value}>{children}</TodayContext.Provider>;
+}
+
+export function useToday() {
+  const ctx = useContext(TodayContext);
+  if (!ctx) throw new Error("useToday must be used within TodayProvider");
+  return ctx;
+}
+
+export type { ProactivePrompt };

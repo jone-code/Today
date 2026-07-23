@@ -96,7 +96,7 @@ AI 自动整理、总结、建立长期记忆，并在未来主动关联。随�
 
 | 层 | 选型 |
 |----|------|
-| 前端 | Next.js + TS + Tailwind（按 `features/*` 拆能力） |
+| 前端 | Next.js in `apps/web`（`features/*` + `shared/`） |
 | 后端 | **Spring Boot 3 + Java 17**（按 `com.today.*` 包拆模块） |
 | 契约 | `packages/contracts`（前端 Zod；Java DTO 对齐） |
 | 数据 | **MySQL 8 + MyBatis**（原生，不用 MyBatis-Plus） |
@@ -123,4 +123,4 @@ npm run dev:web
 - Web: [http://localhost:3000](http://localhost:3000)（`/login` `/register` `/app` `/app/reminders`）
 - API health: [http://localhost:3001/health](http://localhost:3001/health)
 
-当前状态：**注册登录（JWT）与定时提醒已落地**；`aigateway` 已接通 OpenAI 兼容 LLM + Embedding 检索（无 key / 失败时 Heuristic 降级）；未登录时前端可本地 fallback。
+当前状态：**前端已迁入 `apps/web`**；注册登录（JWT）与定时提醒已落地；`aigateway` 已接通 OpenAI 兼容 LLM + Embedding 检索（无 key / 失败时 Heuristic 降级）；未登录时前端可本地 fallback。

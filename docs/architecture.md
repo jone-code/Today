@@ -28,7 +28,7 @@ today/
     └── architecture.md
 ```
 
-当前仓库根目录仍是早期单包 demo，**迁移顺序**：先立契约与 api 骨架 → 再把 `src/` 迁入 `apps/web` → 删掉本地启发式“假 AI”。
+当前仓库：**前端已迁入 `apps/web`（`features/*` + `shared/`）**；后端在 `apps/api`；契约在 `packages/contracts`。
 
 ---
 
@@ -40,9 +40,9 @@ today/
 |----|------|------|
 | 框架 | **Next.js（App Router）+ TypeScript** | 已有基础；SSR/落地页 + App 内交互都合适 |
 | 样式 | **Tailwind CSS** | 迭代快，适合品牌向 UI |
-| 数据请求 | **TanStack Query** | 时间轴/记忆/今日状态缓存与失效清晰 |
+| 数据请求 | fetch + context（TanStack Query 可后续加） | MVP 先简单；缓存策略可再升级 |
 | 表单 | 原生 + 小组件即可 | MVP 只有一个主输入，不必上重型表单库 |
-| 鉴权（二期） | Auth.js / Clerk 择一 | 本期可先用 dev user |
+| 鉴权 | JWT（Bearer）+ 本地 token | 与 `apps/api` identity 对齐 |
 
 **前端模块目录（按能力）：**
 
@@ -51,15 +51,16 @@ apps/web/src/
 ├── app/                      # 路由壳：/ 、/app/*
 ├── features/
 │   ├── checkin/              # 每日记录
-│   ├── summary/              # 展示/触发总结（不直接调模型）
+│   ├── summary/              # 展示日总结（不直接调模型）
 │   ├── timeline/             # 时间轴
 │   ├── memory/               # 长期记忆面板
-│   └── proactive/            # 主动关联提示
-├── shared/                   # UI 基元、日期、http client
-└── styles/
+│   ├── proactive/            # 主动关联提示
+│   ├── identity/             # 登录注册
+│   └── reminder/             # 定时提醒
+└── shared/                   # UI 壳、http client、本地 fallback
 ```
 
-前端 **不算** AI 实现层：只消费 API，渲染结果。
+前端 **不算** AI 实现层：只消费 API，渲染结果（无 key 时可用本地 heuristic fallback）。
 
 ### 3.2 后端 `apps/api`
 
@@ -271,8 +272,9 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 4. ✅ 在 `aigateway` 接通 LLM HTTP Client；保留 Heuristic 降级
 5. ✅ 补 proactive 检索式关联（embedding + 余弦相似度 Top-K；无向量时按 strength 降级）
 6. ✅ 慢路径异步化：checkin 先返回 → 后台更新 summary/memory（可轮询 summary）
-7. 迁 `apps/web`，features 目录化
-8. 向量库外挂（记忆量上来后再考虑）
+7. ✅ 迁 `apps/web`，features 目录化
+8. 接入 TanStack Query；逐步去掉本地 heuristic fallback（强制走 API）
+9. 向量库外挂（记忆量上来后再考虑）
 
 ---
 
