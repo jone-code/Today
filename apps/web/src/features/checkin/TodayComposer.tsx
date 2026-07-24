@@ -132,8 +132,13 @@ export function TodayComposer() {
     <div className="composer-stack">
       <ProactivePromptList
         prompts={prompts}
-        onSelect={(p) => {
-          setText((prev) => (prev.trim() ? `${prev.trim()}\n${p.text}` : p.text));
+        onSelect={(p, scaffold) => {
+          setText((prev) => {
+            const base = scaffold || "";
+            if (!prev.trim()) return base;
+            if (!base) return prev;
+            return `${prev.trim()}\n${base}`;
+          });
           setJustSaved(true);
         }}
       />

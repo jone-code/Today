@@ -19,7 +19,8 @@ for file in \
   migration-auth-reminder.sql \
   migration-memory-embedding.sql \
   migration-todo-punch.sql \
-  migration-memory-manage.sql
+  migration-memory-manage.sql \
+  migration-proactive-events.sql
 do
   path="$DB_DIR/$file"
   echo "→ $file"
