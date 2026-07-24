@@ -19,12 +19,17 @@ public class AiGatewayService {
   private final AiProperties properties;
   private final OpenAiCompatibleClient client;
   private final AiPromptTemplates prompts;
+  private final AiCallObserver observer;
 
   public AiGatewayService(
-      AiProperties properties, OpenAiCompatibleClient client, AiPromptTemplates prompts) {
+      AiProperties properties,
+      OpenAiCompatibleClient client,
+      AiPromptTemplates prompts,
+      AiCallObserver observer) {
     this.properties = properties;
     this.client = client;
     this.prompts = prompts;
+    this.observer = observer;
   }
 
   public AiProvider getActiveProvider() {
@@ -41,6 +46,7 @@ public class AiGatewayService {
   public <T> AiResult<T> complete(
       AiTask task, Object input, TypeReference<T> type, Supplier<T> heuristic) {
     if (!properties.isConfigured()) {
+      observer.recordSkippedComplete(task);
       return new AiResult<>(heuristic.get(), AiProvider.heuristic);
     }
 
@@ -54,17 +60,14 @@ public class AiGatewayService {
       if (parsed == null) {
         throw new IllegalStateException("parsed LLM payload is null");
       }
-      log.info(
-          "ai complete ok task={} provider=llm elapsedMs={}",
-          task,
-          System.currentTimeMillis() - start);
+      long elapsed = System.currentTimeMillis() - start;
+      log.info("ai complete ok task={} provider=llm elapsedMs={}", task, elapsed);
+      observer.recordComplete(task, AiProvider.llm, "ok", elapsed, null);
       return new AiResult<>(parsed, AiProvider.llm);
     } catch (Exception e) {
-      log.warn(
-          "ai complete fallback task={} elapsedMs={} reason={}",
-          task,
-          System.currentTimeMillis() - start,
-          e.toString());
+      long elapsed = System.currentTimeMillis() - start;
+      log.warn("ai complete fallback task={} elapsedMs={} reason={}", task, elapsed, e.toString());
+      observer.recordComplete(task, AiProvider.heuristic, "fallback", elapsed, e.toString());
       return new AiResult<>(heuristic.get(), AiProvider.heuristic);
     }
   }
@@ -72,20 +75,24 @@ public class AiGatewayService {
   /** 批量 embedding；无 key / 失败返回 empty（调用方走 strength 降级检索） */
   public Optional<List<float[]>> embed(List<String> texts) {
     if (!properties.isConfigured() || texts == null || texts.isEmpty()) {
+      observer.recordSkippedEmbed();
       return Optional.empty();
     }
     long start = System.currentTimeMillis();
     try {
       List<float[]> vectors = client.embed(texts);
-      log.info(
-          "ai embed ok count={} elapsedMs={}", texts.size(), System.currentTimeMillis() - start);
+      long elapsed = System.currentTimeMillis() - start;
+      log.info("ai embed ok count={} elapsedMs={}", texts.size(), elapsed);
+      observer.recordEmbed(AiProvider.llm, "ok", elapsed, texts.size(), null);
       return Optional.of(vectors);
     } catch (Exception e) {
+      long elapsed = System.currentTimeMillis() - start;
       log.warn(
           "ai embed failed count={} elapsedMs={} reason={}",
           texts.size(),
-          System.currentTimeMillis() - start,
+          elapsed,
           e.toString());
+      observer.recordEmbed(AiProvider.llm, "failed", elapsed, texts.size(), e.toString());
       return Optional.empty();
     }
   }
