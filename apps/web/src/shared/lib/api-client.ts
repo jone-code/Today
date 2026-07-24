@@ -24,20 +24,24 @@ export function setAuthToken(token: string | null) {
   else localStorage.setItem(TOKEN_KEY, token);
 }
 
-async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+async function requestJson<T>(
+  path: string,
+  init?: RequestInit & { timeoutMs?: number },
+): Promise<T> {
   const controller = new AbortController();
-  const timeoutMs = 8000;
+  const { timeoutMs: customTimeout, ...fetchInit } = init ?? {};
+  const timeoutMs = customTimeout ?? 12000;
   const t = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const token = getAuthToken();
     const headers: Record<string, string> = {
       "content-type": "application/json",
-      ...(init?.headers as Record<string, string> | undefined),
+      ...(fetchInit.headers as Record<string, string> | undefined),
     };
     if (token) headers.authorization = `Bearer ${token}`;
 
     const res = await fetch(`${getApiBaseUrl()}${path}`, {
-      ...init,
+      ...fetchInit,
       headers,
       signal: controller.signal,
     });
@@ -206,12 +210,21 @@ export async function apiPostCheckin(rawText: string): Promise<{
 /** 轮询直到 summary 就绪（async checkin 后） */
 export async function apiWaitForSummary(
   date: string,
-  opts?: { attempts?: number; intervalMs?: number },
+  opts?: {
+    attempts?: number;
+    intervalMs?: number;
+    onAttempt?: (attempt: number, attempts: number) => void;
+    signal?: AbortSignal;
+  },
 ): Promise<DaySummaryDto> {
   const attempts = opts?.attempts ?? 40;
   const intervalMs = opts?.intervalMs ?? 750;
   let lastError: unknown;
   for (let i = 0; i < attempts; i++) {
+    if (opts?.signal?.aborted) {
+      throw new Error("已取消等待总结");
+    }
+    opts?.onAttempt?.(i + 1, attempts);
     try {
       return await apiGetSummaryByDate(date);
     } catch (e) {
@@ -223,7 +236,7 @@ export async function apiWaitForSummary(
   }
   throw lastError instanceof Error
     ? lastError
-    : new Error("summary not ready after polling");
+    : new Error("总结还没准备好，请再试一次");
 }
 
 export async function apiGetMemories(): Promise<{ items: MemoryDto[] }> {

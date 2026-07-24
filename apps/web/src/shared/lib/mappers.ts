@@ -41,6 +41,7 @@ export function mapCheckinDtoToDayEntry(
     rawText: checkin.rawText,
     createdAt: checkin.createdAt,
     summary: summary ? mapSummaryDtoToDaySummary(summary) : pendingSummary(),
+    summaryStatus: summary ? "ready" : "processing",
   };
 }
 
@@ -58,6 +59,7 @@ export function mapTimelineItemToDayEntry(item: TimelineItemDto): DayEntry {
       oneLiner: item.oneLiner,
       highlight: item.highlight,
     },
+    summaryStatus: "ready",
   };
 }
 

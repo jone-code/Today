@@ -1,11 +1,15 @@
 export type Mood = "great" | "good" | "okay" | "tired" | "low";
 
+export type SummaryStatus = "ready" | "processing";
+
 export type DayEntry = {
   id: string;
   date: string; // YYYY-MM-DD
   rawText: string;
   createdAt: string;
   summary: DaySummary;
+  /** async checkin 后 summary 尚未生成时为 processing */
+  summaryStatus: SummaryStatus;
 };
 
 export type DaySummary = {
@@ -30,3 +34,10 @@ export type ProactivePrompt = {
   text: string;
   relatedDate?: string;
 };
+
+/** 主链路保存阶段（UI 状态机） */
+export type CheckinLoopPhase =
+  | "idle"
+  | "submitting"
+  | "processing"
+  | "error";
