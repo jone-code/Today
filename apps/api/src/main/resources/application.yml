@@ -30,6 +30,7 @@ today:
     temperature: ${OPENAI_TEMPERATURE:0.3}
     retrieve-top-k: ${OPENAI_RETRIEVE_TOP_K:5}
     async-checkin: ${TODAY_AI_ASYNC_CHECKIN:true}
+    job-poll-ms: ${TODAY_AI_JOB_POLL_MS:15000}
   vector:
     # mysql = 扫描 embedding_json；qdrant = 外挂向量库（失败回退 mysql）
     provider: ${TODAY_VECTOR_PROVIDER:mysql}

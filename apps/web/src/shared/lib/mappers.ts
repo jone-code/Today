@@ -34,14 +34,28 @@ export function pendingSummary(): DayEntry["summary"] {
 export function mapCheckinDtoToDayEntry(
   checkin: CheckinDto,
   summary: DaySummaryDto | null,
+  aiJob?: {
+    status: string;
+    attempts: number;
+    maxAttempts: number;
+    lastError?: string | null;
+  } | null,
 ): DayEntry {
+  const terminalFailed =
+    !!aiJob &&
+    aiJob.status === "failed" &&
+    aiJob.attempts >= aiJob.maxAttempts &&
+    !summary;
   return {
     id: checkin.id,
     date: checkin.date,
     rawText: checkin.rawText,
     createdAt: checkin.createdAt,
     summary: summary ? mapSummaryDtoToDaySummary(summary) : pendingSummary(),
-    summaryStatus: summary ? "ready" : "processing",
+    summaryStatus: summary ? "ready" : terminalFailed ? "failed" : "processing",
+    pipelineError: terminalFailed
+      ? aiJob?.lastError || "整理失败，请重试"
+      : undefined,
   };
 }
 

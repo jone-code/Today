@@ -16,6 +16,7 @@ public class CheckinController {
   private final CheckinService checkins;
   private final SummaryService summaries;
   private final CheckinAiPipeline pipeline;
+  private final CheckinAiJobService aiJobs;
   private final IdentityService identity;
   private final AiProperties aiProperties;
 
@@ -23,11 +24,13 @@ public class CheckinController {
       CheckinService checkins,
       SummaryService summaries,
       CheckinAiPipeline pipeline,
+      CheckinAiJobService aiJobs,
       IdentityService identity,
       AiProperties aiProperties) {
     this.checkins = checkins;
     this.summaries = summaries;
     this.pipeline = pipeline;
+    this.aiJobs = aiJobs;
     this.identity = identity;
     this.aiProperties = aiProperties;
   }
@@ -35,7 +38,9 @@ public class CheckinController {
   @GetMapping("/v1/checkins/today")
   public CheckinTodayResponse today() {
     CheckinDto checkin = checkins.getToday();
-    return new CheckinTodayResponse(checkin);
+    CheckinAiJobDto job =
+        checkin == null ? null : aiJobs.findByCheckinId(checkin.id());
+    return new CheckinTodayResponse(checkin, job);
   }
 
   @PostMapping("/v1/checkins")
@@ -44,13 +49,28 @@ public class CheckinController {
     String userId = identity.getCurrentUserId();
 
     if (aiProperties.isAsyncCheckin()) {
-      pipeline.processAfterCheckin(userId, checkin.id(), checkin.date(), checkin.rawText());
+      CheckinAiJobDto job =
+          aiJobs.enqueueAndKick(userId, checkin.id(), checkin.date(), checkin.rawText());
       return new CheckinSubmitResult(
-          checkin, null, CheckinSubmitResult.STATUS_PROCESSING);
+          checkin, null, CheckinSubmitResult.STATUS_PROCESSING, job);
     }
 
     pipeline.processAfterCheckinSync(userId, checkin.id(), checkin.date(), checkin.rawText());
     DaySummaryDto summary = summaries.getByDate(checkin.date());
-    return new CheckinSubmitResult(checkin, summary, CheckinSubmitResult.STATUS_READY);
+    return new CheckinSubmitResult(checkin, summary, CheckinSubmitResult.STATUS_READY, null);
+  }
+
+  /** 手动重跑今日 AI 流水线（失败后「继续整理」） */
+  @PostMapping("/v1/checkins/today/reprocess")
+  public CheckinSubmitResult reprocessToday() {
+    CheckinDto checkin = checkins.getToday();
+    if (checkin == null) {
+      throw new org.springframework.web.server.ResponseStatusException(
+          org.springframework.http.HttpStatus.NOT_FOUND, "today checkin not found");
+    }
+    CheckinAiJobDto job =
+        aiJobs.requestRetry(identity.getCurrentUserId(), checkin.id());
+    return new CheckinSubmitResult(
+        checkin, null, CheckinSubmitResult.STATUS_PROCESSING, job);
   }
 }
