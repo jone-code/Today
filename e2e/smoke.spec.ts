@@ -17,7 +17,7 @@ test("login → checkin → memory", async ({ page }) => {
   await page.getByLabel("密码（至少 6 位）").fill(password);
   await page.getByRole("button", { name: "注册并进入" }).click();
   await expect(page).toHaveURL(/\/app\/?$/);
-  await expect(page.getByText(displayName)).toBeVisible();
+  await expect(page.locator(".nav-user")).toHaveText(displayName);
 
   await page.getByRole("button", { name: "退出" }).click();
   await expect(page.getByRole("link", { name: "登录" }).first()).toBeVisible();
@@ -27,10 +27,11 @@ test("login → checkin → memory", async ({ page }) => {
   await page.getByLabel("密码").fill(password);
   await page.getByRole("button", { name: "登录" }).click();
   await expect(page).toHaveURL(/\/app\/?$/);
+  await expect(page.locator(".nav-user")).toHaveText(displayName);
   await expect(page.getByLabel("今天怎么样？")).toBeVisible();
 
   await page.getByLabel("今天怎么样？").fill(rawText);
-  await page.getByRole("button", { name: "留下今天" }).click();
+  await page.getByRole("button", { name: "留下今天", exact: true }).click();
 
   await expect(page.getByText(/今日已留下|今日总结/)).toBeVisible({
     timeout: 15_000,
@@ -46,7 +47,7 @@ test("login → checkin → memory", async ({ page }) => {
   await page.getByRole("link", { name: "记忆" }).click();
   await expect(page).toHaveURL(/\/app\/memory/);
   await expect(page.locator(".memory-item").first()).toBeVisible({
-    timeout: 30_000,
+    timeout: 60_000,
   });
   await expect(page.locator(".memory-item").first()).toContainText(
     /运动|学习|压力|工作/,

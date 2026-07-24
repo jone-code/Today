@@ -65,6 +65,19 @@ async function waitForSummary(token, date, attempts = 40, intervalMs = 500) {
   throw lastErr || new Error("summary not ready");
 }
 
+async function waitForMemories(token, attempts = 40, intervalMs = 500) {
+  let last = [];
+  for (let i = 1; i <= attempts; i++) {
+    const memories = await request("/v1/memories", { token });
+    last = memories.items || [];
+    if (last.length >= 1) return last;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  throw new Error(
+    `expected at least one memory after checkin (got ${last.length})`,
+  );
+}
+
 async function main() {
   console.log(`API smoke against ${API_BASE}`);
 
@@ -120,11 +133,8 @@ async function main() {
   }
   log("summary", summary.oneLiner);
 
-  const memories = await request("/v1/memories", { token });
-  const items = memories.items || [];
-  if (items.length < 1) {
-    throw new Error("expected at least one memory after checkin");
-  }
+  // memory upsert runs after summary in the async pipeline
+  const items = await waitForMemories(token);
   log("memories", `${items.length} item(s); first=${items[0].text}`);
 
   // manage path briefly
