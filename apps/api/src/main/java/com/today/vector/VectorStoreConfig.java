@@ -14,8 +14,8 @@ public class VectorStoreConfig {
   }
 
   @Bean
-  QdrantVectorStore qdrantVectorStore(QdrantClient client) {
-    return new QdrantVectorStore(client);
+  QdrantVectorStore qdrantVectorStore(QdrantClient client, VectorProperties properties) {
+    return new QdrantVectorStore(client, properties);
   }
 
   @Bean

@@ -1,6 +1,8 @@
 package com.today.health;
 
 import com.today.aigateway.AiGatewayService;
+import com.today.vector.VectorHealth;
+import com.today.vector.VectorReindexService;
 import com.today.vector.VectorStore;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -13,10 +15,13 @@ public class HealthController {
 
   private final AiGatewayService aiGateway;
   private final VectorStore vectorStore;
+  private final VectorReindexService vectorReindex;
 
-  public HealthController(AiGatewayService aiGateway, VectorStore vectorStore) {
+  public HealthController(
+      AiGatewayService aiGateway, VectorStore vectorStore, VectorReindexService vectorReindex) {
     this.aiGateway = aiGateway;
     this.vectorStore = vectorStore;
+    this.vectorReindex = vectorReindex;
   }
 
   @GetMapping("/health")
@@ -27,6 +32,8 @@ public class HealthController {
     body.put("stack", "spring-boot");
     body.put("aiProvider", aiGateway.getActiveProvider().name());
     body.put("vectorProvider", vectorStore.provider());
+    VectorHealth vh = vectorReindex.health();
+    body.put("vector", vh.toMap());
     body.put(
         "modules",
         List.of(

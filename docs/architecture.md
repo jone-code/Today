@@ -294,6 +294,7 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 12. ✅ 向量库外挂（`VectorStore`：mysql 默认 / qdrant 可选 + 回退；见 `docs/vector-store.md`）
 13. ✅ e2e 冒烟（登录→打卡→记忆；`npm run e2e:smoke`）
 14. ✅ 主动关联变真（跨日追问候选、指纹去重、已回答/忽略抑制、选择填脚手架；见 `proactive_prompt_events`）
+15. ✅ 向量库可运维（reindex/backfill、recreate、`/health.vector`；`scripts/vector-reindex.sh`）
 
 ---
 

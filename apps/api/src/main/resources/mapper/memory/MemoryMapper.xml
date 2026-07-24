@@ -54,4 +54,29 @@
     DELETE FROM memories
     WHERE id = #{id} AND user_id = #{userId}
   </delete>
+
+  <select id="countWithEmbedding" resultType="int">
+    SELECT COUNT(*)
+    FROM memories
+    WHERE embedding_json IS NOT NULL AND embedding_json &lt;&gt; ''
+  </select>
+
+  <select id="countAll" resultType="int">
+    SELECT COUNT(*) FROM memories
+  </select>
+
+  <select id="listPage" resultMap="MemoryEntityMap">
+    SELECT id, user_id, category, memory_text, strength, archived, embedding_json, updated_at
+    FROM memories
+    ORDER BY updated_at DESC, id ASC
+    LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <select id="listPageByUserId" resultMap="MemoryEntityMap">
+    SELECT id, user_id, category, memory_text, strength, archived, embedding_json, updated_at
+    FROM memories
+    WHERE user_id = #{userId}
+    ORDER BY updated_at DESC, id ASC
+    LIMIT #{limit} OFFSET #{offset}
+  </select>
 </mapper>
