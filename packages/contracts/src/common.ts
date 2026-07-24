@@ -15,6 +15,7 @@ export const ApiRoutes = {
   authMe: "/v1/auth/me",
   checkinToday: "/v1/checkins/today",
   checkins: "/v1/checkins",
+  checkinReprocessToday: "/v1/checkins/today/reprocess",
   summaryByDate: "/v1/summaries/:date",
   memories: "/v1/memories",
   memoryById: "/v1/memories/:id",

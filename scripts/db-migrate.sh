@@ -20,7 +20,8 @@ for file in \
   migration-memory-embedding.sql \
   migration-todo-punch.sql \
   migration-memory-manage.sql \
-  migration-proactive-events.sql
+  migration-proactive-events.sql \
+  migration-checkin-ai-jobs.sql
 do
   path="$DB_DIR/$file"
   echo "→ $file"

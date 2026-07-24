@@ -187,8 +187,19 @@ export async function apiMe(): Promise<UserDto> {
   return requestJson("/v1/auth/me");
 }
 
+export type CheckinAiJobDto = {
+  id: string;
+  checkinId: string;
+  checkinDate: string;
+  status: "pending" | "running" | "succeeded" | "failed";
+  attempts: number;
+  maxAttempts: number;
+  lastError?: string | null;
+};
+
 export async function apiGetTodayCheckin(): Promise<{
   checkin: CheckinDto | null;
+  aiJob?: CheckinAiJobDto | null;
 }> {
   return requestJson("/v1/checkins/today");
 }
@@ -200,7 +211,8 @@ export async function apiGetSummaryByDate(date: string): Promise<DaySummaryDto> 
 export async function apiPostCheckin(rawText: string): Promise<{
   checkin: CheckinDto;
   summary: DaySummaryDto | null;
-  status: "processing" | "ready";
+  status: "processing" | "ready" | "failed";
+  aiJob?: CheckinAiJobDto | null;
 }> {
   return requestJson("/v1/checkins", {
     method: "POST",
@@ -208,7 +220,16 @@ export async function apiPostCheckin(rawText: string): Promise<{
   });
 }
 
-/** 轮询直到 summary 就绪（async checkin 后） */
+export async function apiReprocessTodayCheckin(): Promise<{
+  checkin: CheckinDto;
+  summary: DaySummaryDto | null;
+  status: "processing" | "ready" | "failed";
+  aiJob?: CheckinAiJobDto | null;
+}> {
+  return requestJson("/v1/checkins/today/reprocess", { method: "POST" });
+}
+
+/** 轮询直到 summary 就绪；若 AI job 终态失败则提前抛错 */
 export async function apiWaitForSummary(
   date: string,
   opts?: {
@@ -226,6 +247,20 @@ export async function apiWaitForSummary(
       throw new Error("已取消等待总结");
     }
     opts?.onAttempt?.(i + 1, attempts);
+
+    try {
+      const today = await apiGetTodayCheckin();
+      const job = today.aiJob;
+      if (job?.status === "failed" && job.attempts >= job.maxAttempts) {
+        throw Object.assign(new Error(job.lastError || "整理失败，请重试"), {
+          code: "ai_job_failed",
+        });
+      }
+    } catch (e) {
+      if ((e as { code?: string }).code === "ai_job_failed") throw e;
+      // today 接口瞬时失败时继续等 summary
+    }
+
     try {
       return await apiGetSummaryByDate(date);
     } catch (e) {

@@ -165,7 +165,8 @@ export function TodayComposer() {
           <div className="composer-actions">
             <span className="hint">可以重试整理，或改写后再提交</span>
             <div className="action-pair">
-              {todayEntry?.summaryStatus === "processing" ? (
+              {todayEntry?.summaryStatus === "processing" ||
+              todayEntry?.summaryStatus === "failed" ? (
                 <button
                   type="button"
                   className="btn-primary"

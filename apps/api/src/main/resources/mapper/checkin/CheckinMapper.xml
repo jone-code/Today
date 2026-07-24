@@ -20,6 +20,13 @@
     LIMIT 1
   </select>
 
+  <select id="findById" resultMap="CheckinEntityMap">
+    SELECT id, user_id, checkin_date, raw_text, created_at, updated_at
+    FROM checkins
+    WHERE id = #{id}
+    LIMIT 1
+  </select>
+
   <select id="listRecentByUserId" resultMap="CheckinEntityMap">
     SELECT id, user_id, checkin_date, raw_text, created_at, updated_at
     FROM checkins

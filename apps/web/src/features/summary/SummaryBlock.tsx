@@ -4,13 +4,22 @@ import { moodEmoji } from "@/shared/lib/ai";
 import type { DayEntry } from "@/shared/lib/types";
 
 export function SummaryBlock({ entry }: { entry: DayEntry }) {
-  const { summary, summaryStatus } = entry;
+  const { summary, summaryStatus, pipelineError } = entry;
   const processing = summaryStatus === "processing";
+  const failed = summaryStatus === "failed";
 
   return (
-    <div className={processing ? "summary summary-processing" : "summary"}>
+    <div
+      className={
+        processing || failed ? "summary summary-processing" : "summary"
+      }
+    >
       <p className="one-liner">{summary.oneLiner}</p>
-      {processing ? (
+      {failed ? (
+        <p className="form-error summary-wait">
+          {pipelineError || "整理失败，可以点「继续整理」再试一次。"}
+        </p>
+      ) : processing ? (
         <p className="muted summary-wait">AI 正在整理完成项、情绪与关键词…</p>
       ) : (
         <>

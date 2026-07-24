@@ -28,6 +28,9 @@ public class AiProperties {
   /** checkin 提交后是否异步跑 summary/memory（关闭则同步，便于本地调试） */
   private boolean asyncCheckin = true;
 
+  /** 异步任务调度轮询间隔（毫秒） */
+  private long jobPollMs = 15000;
+
   public String getApiKey() {
     return apiKey;
   }
@@ -98,6 +101,14 @@ public class AiProperties {
 
   public void setAsyncCheckin(boolean asyncCheckin) {
     this.asyncCheckin = asyncCheckin;
+  }
+
+  public long getJobPollMs() {
+    return jobPollMs;
+  }
+
+  public void setJobPollMs(long jobPollMs) {
+    this.jobPollMs = jobPollMs;
   }
 
   public boolean isConfigured() {

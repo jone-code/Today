@@ -62,4 +62,10 @@ public class CheckinService {
         .map(EntityMapper::toDto)
         .toList();
   }
+
+  /** 流水线内部按 id 读取（不校验当前用户，调用方已持有 job） */
+  public CheckinDto findByIdForPipeline(String checkinId) {
+    CheckinEntity entity = checkinMapper.findById(checkinId);
+    return entity == null ? null : EntityMapper.toDto(entity);
+  }
 }

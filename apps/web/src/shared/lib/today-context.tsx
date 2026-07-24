@@ -16,7 +16,11 @@ import {
   summarizeToday,
   updateMemoriesFromEntry,
 } from "@/shared/lib/ai";
-import { apiPostCheckin, apiWaitForSummary } from "@/shared/lib/api-client";
+import {
+  apiPostCheckin,
+  apiReprocessTodayCheckin,
+  apiWaitForSummary,
+} from "@/shared/lib/api-client";
 import { useAuth } from "@/shared/lib/auth-context";
 import { allowLocalFallback, mapCheckinDtoToDayEntry } from "@/shared/lib/mappers";
 import { todayKeys } from "@/shared/lib/query-keys";
@@ -109,10 +113,18 @@ export function TodayProvider({ children }: { children: ReactNode }) {
     [refreshToday],
   );
 
-  // 页面加载时若今日仍在 processing，自动续等
+  // 页面加载时若今日仍在 processing，自动续等；failed 则直接进 error
   useEffect(() => {
     const entry = bundleQuery.data?.todayEntry;
-    if (!token || !entry || entry.summaryStatus !== "processing") return;
+    if (!token || !entry) return;
+    if (entry.summaryStatus === "failed") {
+      queueMicrotask(() => {
+        setLoopPhase("error");
+        setLoopMessage(entry.pipelineError || "整理失败，请重试");
+      });
+      return;
+    }
+    if (entry.summaryStatus !== "processing") return;
     if (resumeStartedRef.current === entry.id) return;
     resumeStartedRef.current = entry.id;
     let cancelled = false;
@@ -142,7 +154,7 @@ export function TodayProvider({ children }: { children: ReactNode }) {
         const res = await apiPostCheckin(trimmed);
 
         if (res.status === "processing" || !res.summary) {
-          const pending = mapCheckinDtoToDayEntry(res.checkin, null);
+          const pending = mapCheckinDtoToDayEntry(res.checkin, null, res.aiJob);
           queryClient.setQueryData<TodayBundle>(todayKeys.bundle(), (old) => ({
             entries: old?.entries ?? [],
             memories: old?.memories ?? [],
@@ -152,7 +164,7 @@ export function TodayProvider({ children }: { children: ReactNode }) {
           resumeStartedRef.current = pending.id;
           await waitAndRefresh(res.checkin.date);
           const fresh = queryClient.getQueryData<TodayBundle>(todayKeys.bundle());
-          return fresh?.todayEntry ?? mapCheckinDtoToDayEntry(res.checkin, null);
+          return fresh?.todayEntry ?? mapCheckinDtoToDayEntry(res.checkin, null, res.aiJob);
         }
 
         await refreshToday();
@@ -204,16 +216,20 @@ export function TodayProvider({ children }: { children: ReactNode }) {
   );
 
   const retryProcessing = useCallback(async () => {
-    const date = bundleQuery.data?.todayEntry?.date;
-    if (!date) throw new Error("没有可重试的今日记录");
+    const entry = bundleQuery.data?.todayEntry;
+    if (!entry) throw new Error("没有可重试的今日记录");
     try {
-      await waitAndRefresh(date);
+      setLoopPhase("processing");
+      setLoopMessage("正在重新整理…");
+      await apiReprocessTodayCheckin();
+      resumeStartedRef.current = entry.id;
+      await waitAndRefresh(entry.date);
     } catch (err) {
       setLoopPhase("error");
       setLoopMessage(err instanceof Error ? err.message : "整理失败，请重试");
       throw err;
     }
-  }, [bundleQuery.data?.todayEntry?.date, waitAndRefresh]);
+  }, [bundleQuery.data?.todayEntry, waitAndRefresh]);
 
   const retrySubmit = useCallback(async () => {
     const raw = lastRawTextRef.current;

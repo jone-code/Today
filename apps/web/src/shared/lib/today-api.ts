@@ -45,11 +45,19 @@ export async function fetchTodayBundle(): Promise<TodayBundle> {
   if (checkinRes.checkin) {
     try {
       const summary = await apiGetSummaryByDate(checkinRes.checkin.date);
-      todayEntry = mapCheckinDtoToDayEntry(checkinRes.checkin, summary);
+      todayEntry = mapCheckinDtoToDayEntry(
+        checkinRes.checkin,
+        summary,
+        checkinRes.aiJob,
+      );
     } catch (e) {
       const status = (e as Error & { status?: number }).status;
       if (status === 404) {
-        todayEntry = mapCheckinDtoToDayEntry(checkinRes.checkin, null);
+        todayEntry = mapCheckinDtoToDayEntry(
+          checkinRes.checkin,
+          null,
+          checkinRes.aiJob,
+        );
       } else {
         throw e;
       }

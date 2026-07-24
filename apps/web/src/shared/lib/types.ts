@@ -1,6 +1,6 @@
 export type Mood = "great" | "good" | "okay" | "tired" | "low";
 
-export type SummaryStatus = "ready" | "processing";
+export type SummaryStatus = "ready" | "processing" | "failed";
 
 export type DayEntry = {
   id: string;
@@ -8,8 +8,9 @@ export type DayEntry = {
   rawText: string;
   createdAt: string;
   summary: DaySummary;
-  /** async checkin 后 summary 尚未生成时为 processing */
+  /** async checkin 后 summary 尚未生成时为 processing；流水线终态失败为 failed */
   summaryStatus: SummaryStatus;
+  pipelineError?: string;
 };
 
 export type DaySummary = {

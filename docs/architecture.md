@@ -250,7 +250,7 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
   → 次日 / 当日刷新时 proactive.build
 ```
 
-默认异步：checkin 先返回 `status=processing` → 后台任务更新 summary/memory → 前端轮询 `GET /v1/summaries/:date`。`TODAY_AI_ASYNC_CHECKIN=false` 可同步。
+默认异步：checkin 先入队 `checkin_ai_jobs` 并返回 `status=processing` → 线程池立即执行 + 调度器兜底重试 → 成功写 summary/memory；失败写入 `last_error` 并指数退避。前端可 `POST /v1/checkins/today/reprocess`。「继续整理」会真正重跑流水线。`TODAY_AI_ASYNC_CHECKIN=false` 可同步。
 
 ---
 
@@ -295,6 +295,7 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 13. ✅ e2e 冒烟（登录→打卡→记忆；`npm run e2e:smoke`）
 14. ✅ 主动关联变真（跨日追问候选、指纹去重、已回答/忽略抑制、选择填脚手架；见 `proactive_prompt_events`）
 15. ✅ 向量库可运维（reindex/backfill、recreate、`/health.vector`；`scripts/vector-reindex.sh`）
+16. ✅ 异步可靠化（`checkin_ai_jobs` 持久化 + 重试退避 + 失败可见 + reprocess）
 
 ---
 
