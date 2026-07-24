@@ -14,6 +14,8 @@ src/main/java/com/today/
   aigateway/    模型抽象（OpenAI 兼容 + Heuristic 降级）
   identity/     用户认证
   reminder/     定时提醒
+  todo/         待办
+  punch/        习惯打卡
   persistence/  数据库实体
 ```
 
@@ -95,6 +97,15 @@ npm run dev:api
 
 调度器每分钟扫描一次到期提醒，写入 `reminder_deliveries`。
 
-若数据库已初始化，请执行 `src/main/resources/db/migration-auth-reminder.sql`。
+## Todo / 习惯打卡
+
+- Todos：`GET/POST /v1/todos`，`PUT/DELETE /v1/todos/{id}`，`POST /v1/todos/{id}/toggle`
+- Punch：`GET/POST /v1/punch/habits`，`PUT/DELETE /v1/punch/habits/{id}`，`POST/DELETE /v1/punch/habits/{id}/punch`
+
+已有库迁移（按需执行）：
+
+- `src/main/resources/db/migration-auth-reminder.sql`
+- `src/main/resources/db/migration-memory-embedding.sql`
+- `src/main/resources/db/migration-todo-punch.sql`
 
 表结构完整版见 `src/main/resources/db/schema.sql`。

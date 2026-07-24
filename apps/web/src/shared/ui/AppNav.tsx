@@ -6,6 +6,8 @@ import { useAuth } from "@/shared/lib/auth-context";
 
 const links = [
   { href: "/app", label: "今天" },
+  { href: "/app/todos", label: "待办" },
+  { href: "/app/punch", label: "打卡" },
   { href: "/app/timeline", label: "时间轴" },
   { href: "/app/memory", label: "记忆" },
   { href: "/app/reminders", label: "提醒" },

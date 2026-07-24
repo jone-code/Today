@@ -12,7 +12,9 @@ src/
 │   ├── memory/          # 长期记忆
 │   ├── proactive/       # 主动关联提示
 │   ├── identity/        # 登录注册
-│   └── reminder/        # 定时提醒
+│   ├── reminder/        # 定时提醒
+│   ├── todo/            # 待办
+│   └── punch/           # 习惯打卡
 └── shared/
     ├── lib/             # api-client、context、本地 fallback
     └── ui/              # AppShell / Nav / Providers
@@ -39,5 +41,5 @@ npm run dev -w @today/web
 
 - `features/*` 只通过 HTTP 调 `apps/api`，不内嵌模型 SDK
 - 契约优先从 `@today/contracts` 对齐；HTTP 客户端在 `shared/lib/api-client.ts`
-- 数据请求经 **TanStack Query**（`today` / `reminders` query keys）
+- 数据请求经 **TanStack Query**（`today` / `reminders` / `todos` / `punch` query keys）
 - 默认需登录走 API；仅当 `NEXT_PUBLIC_ALLOW_LOCAL_FALLBACK=true` 时允许未登录本地 demo

@@ -13,3 +13,14 @@ export const authKeys = {
   all: ["auth"] as const,
   me: () => [...authKeys.all, "me"] as const,
 };
+
+export const todoKeys = {
+  all: ["todos"] as const,
+  list: (status: "open" | "done" | "all" = "open") =>
+    [...todoKeys.all, "list", status] as const,
+};
+
+export const punchKeys = {
+  all: ["punch"] as const,
+  habits: (date?: string) => [...punchKeys.all, "habits", date ?? "today"] as const,
+};

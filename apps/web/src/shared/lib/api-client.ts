@@ -292,3 +292,143 @@ export async function apiMarkReminderDeliveryRead(
     method: "POST",
   });
 }
+
+export type TodoDto = {
+  id: string;
+  userId: string;
+  title: string;
+  note: string | null;
+  status: "open" | "done";
+  dueDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+};
+
+export type PunchHabitDto = {
+  id: string;
+  userId: string;
+  title: string;
+  description: string | null;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+  punchedToday: boolean;
+  streak: number;
+};
+
+export type PunchLogDto = {
+  id: string;
+  habitId: string;
+  userId: string;
+  punchDate: string;
+  note: string | null;
+  createdAt: string;
+};
+
+export async function apiListTodos(
+  status?: "open" | "done" | "all",
+): Promise<{ items: TodoDto[] }> {
+  const q =
+    status && status !== "all"
+      ? `?status=${encodeURIComponent(status)}`
+      : "";
+  return requestJson(`/v1/todos${q}`);
+}
+
+export async function apiCreateTodo(input: {
+  title: string;
+  note?: string;
+  dueDate?: string | null;
+}): Promise<TodoDto> {
+  return requestJson("/v1/todos", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function apiUpdateTodo(
+  id: string,
+  input: Partial<{
+    title: string;
+    note: string | null;
+    dueDate: string | null;
+    status: "open" | "done";
+    clearDueDate: boolean;
+  }>,
+): Promise<TodoDto> {
+  return requestJson(`/v1/todos/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function apiToggleTodo(id: string): Promise<TodoDto> {
+  return requestJson(`/v1/todos/${encodeURIComponent(id)}/toggle`, {
+    method: "POST",
+  });
+}
+
+export async function apiDeleteTodo(id: string): Promise<void> {
+  await requestJson(`/v1/todos/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function apiListPunchHabits(
+  date?: string,
+): Promise<{ items: PunchHabitDto[]; date: string }> {
+  const q = date ? `?date=${encodeURIComponent(date)}` : "";
+  return requestJson(`/v1/punch/habits${q}`);
+}
+
+export async function apiCreatePunchHabit(input: {
+  title: string;
+  description?: string | null;
+  enabled?: boolean;
+}): Promise<PunchHabitDto> {
+  return requestJson("/v1/punch/habits", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function apiUpdatePunchHabit(
+  id: string,
+  input: Partial<{
+    title: string;
+    description: string | null;
+    enabled: boolean;
+  }>,
+): Promise<PunchHabitDto> {
+  return requestJson(`/v1/punch/habits/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function apiDeletePunchHabit(id: string): Promise<void> {
+  await requestJson(`/v1/punch/habits/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function apiPunchHabit(
+  id: string,
+  input?: { date?: string; note?: string | null },
+): Promise<PunchLogDto> {
+  return requestJson(`/v1/punch/habits/${encodeURIComponent(id)}/punch`, {
+    method: "POST",
+    body: JSON.stringify(input ?? {}),
+  });
+}
+
+export async function apiUnpunchHabit(
+  id: string,
+  date?: string,
+): Promise<void> {
+  const q = date ? `?date=${encodeURIComponent(date)}` : "";
+  await requestJson(`/v1/punch/habits/${encodeURIComponent(id)}/punch${q}`, {
+    method: "DELETE",
+  });
+}

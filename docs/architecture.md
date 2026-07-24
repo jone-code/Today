@@ -56,7 +56,9 @@ apps/web/src/
 │   ├── memory/               # 长期记忆面板
 │   ├── proactive/            # 主动关联提示
 │   ├── identity/             # 登录注册
-│   └── reminder/             # 定时提醒
+│   ├── reminder/             # 定时提醒
+│   ├── todo/                 # 待办
+│   └── punch/                # 习惯打卡
 └── shared/                   # UI 壳、http client、本地 fallback
 ```
 
@@ -87,6 +89,8 @@ apps/api/src/main/java/com/today/
 ├── aigateway/
 ├── identity/
 ├── reminder/
+├── todo/
+├── punch/
 └── health/
 ```
 
@@ -260,7 +264,8 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 
 ## 7. 明确不做（与产品一致，防模块膨胀）
 
-社区、好友、评论、分享、复杂统计、AI 绘图、心理咨询、目标/Todo、打卡排行 —— **不建模块、不建表**。
+社区、好友、评论、分享、复杂统计、AI 绘图、心理咨询、打卡排行榜 —— **不建模块、不建表**。  
+（Todo / 习惯打卡已按产品优先级落地；不做社交化排行。）
 
 ---
 
@@ -274,8 +279,8 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 6. ✅ 慢路径异步化：checkin 先返回 → 后台更新 summary/memory（可轮询 summary）
 7. ✅ 迁 `apps/web`，features 目录化
 8. ✅ 接入 TanStack Query；默认强制走 API（本地 fallback 需 `NEXT_PUBLIC_ALLOW_LOCAL_FALLBACK=true`）
-9. 向量库外挂（记忆量上来后再考虑）
-10. Todo / 打卡合入 `apps/web` features（若保留该产品线）
+9. ✅ Todo / 习惯打卡合入 `apps/api` + `apps/web` features
+10. 向量库外挂（记忆量上来后再考虑）
 
 ---
 

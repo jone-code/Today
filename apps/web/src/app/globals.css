@@ -727,3 +727,95 @@ textarea {
   align-items: flex-end;
 }
 
+.module-panel {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.module-form {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.module-form h2 {
+  margin: 0;
+  font-family: var(--font-display), "Noto Serif SC", serif;
+  font-weight: 500;
+}
+
+.module-form label {
+  display: grid;
+  gap: 0.4rem;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+}
+
+.module-form input {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--ink);
+  outline: none;
+}
+
+.module-form input:focus {
+  border-color: rgba(47, 111, 108, 0.45);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.filter-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.chip {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-soft);
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.chip.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.module-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.module-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.module-item strong {
+  font-family: var(--font-display), "Noto Serif SC", serif;
+  font-size: 1.1rem;
+}
+
+.done-title {
+  text-decoration: line-through;
+  color: var(--ink-soft);
+}
+
+.module-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  align-items: flex-end;
+}
+

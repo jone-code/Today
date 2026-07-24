@@ -65,9 +65,9 @@ AI 自动整理、总结、建立长期记忆，并在未来主动关联。随�
 
 ### 第一版明确不做
 
-社区、好友、评论、分享、复杂统计、AI 绘图、心理咨询、目标管理、Todo、打卡排行榜。
+社区、好友、评论、分享、复杂统计、AI 绘图、心理咨询、打卡排行榜。
 
-所有精力围绕：**每天记录 + AI 长期记忆。**
+核心仍围绕：**每天记录 + AI 长期记忆**；Todo / 习惯打卡作为日常工具轻量配套。
 
 ---
 
@@ -102,7 +102,7 @@ AI 自动整理、总结、建立长期记忆，并在未来主动关联。随�
 | 数据 | **MySQL 8 + MyBatis**（原生，不用 MyBatis-Plus） |
 | AI | `ai-gateway`（OpenAI 兼容；无 key 时 Heuristic 降级） |
 
-业务模块：`checkin` · `summary` · `memory` · `timeline` · `proactive` · `identity` · `reminder` · `ai-gateway`
+业务模块：`checkin` · `summary` · `memory` · `timeline` · `proactive` · `identity` · `reminder` · `todo` · `punch` · `ai-gateway`
 
 ## 本地开发
 
@@ -120,7 +120,7 @@ npm run dev:api
 npm run dev:web
 ```
 
-- Web: [http://localhost:3000](http://localhost:3000)（`/login` `/register` `/app` `/app/reminders`）
+- Web: [http://localhost:3000](http://localhost:3000)（`/login` `/register` `/app` `/app/todos` `/app/punch` `/app/reminders`）
 - API health: [http://localhost:3001/health](http://localhost:3001/health)
 
-当前状态：**前端已迁入 `apps/web` 并接入 TanStack Query**；默认强制登录走 API（本地 fallback 需显式开启）；`aigateway` 已接通 OpenAI 兼容 LLM + Embedding 检索；checkin AI 流水线异步。
+当前状态：**前端已迁入 `apps/web` 并接入 TanStack Query**；Todo / 习惯打卡已落地；默认强制登录走 API；`aigateway` 已接通 OpenAI 兼容 LLM + Embedding 检索；checkin AI 流水线异步。
