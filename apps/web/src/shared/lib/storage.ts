@@ -13,7 +13,12 @@ export function loadEntries(): DayEntry[] {
     const raw = localStorage.getItem(ENTRIES_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as DayEntry[];
-    return parsed.sort((a, b) => b.date.localeCompare(a.date));
+    return parsed
+      .map((e) => ({
+        ...e,
+        summaryStatus: e.summaryStatus ?? ("ready" as const),
+      }))
+      .sort((a, b) => b.date.localeCompare(a.date));
   } catch {
     return [];
   }
