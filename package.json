@@ -16,6 +16,8 @@
     "build:api": "cd apps/api && mvn -q package -DskipTests",
     "start": "npm run start -w @today/web",
     "lint": "npm run lint -w @today/web",
-    "typecheck:contracts": "npm run typecheck -w @today/contracts"
+    "typecheck:contracts": "npm run typecheck -w @today/contracts",
+    "db:migrate": "bash scripts/db-migrate.sh",
+    "db:schema": "mysql -h${MYSQL_HOST:-127.0.0.1} -P${MYSQL_PORT:-3306} -u${MYSQL_USER:-today} -p${MYSQL_PASSWORD:-today} < apps/api/src/main/resources/db/schema.sql"
   }
 }
