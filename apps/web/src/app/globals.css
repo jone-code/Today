@@ -369,10 +369,17 @@ textarea {
   gap: 0.55rem;
 }
 
+.prompt-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+
 .prompt-line {
   margin: 0;
   padding: 0.85rem 0;
-  border-top: 1px solid var(--line);
+  border-top: 0;
   color: var(--accent);
   line-height: 1.55;
   font-size: 0.98rem;
@@ -386,11 +393,11 @@ textarea {
 
 .prompt-btn {
   display: block;
-  width: 100%;
+  flex: 1;
+  width: auto;
   text-align: left;
   background: transparent;
   border: 0;
-  border-top: 1px solid var(--line);
   cursor: pointer;
   transition: color 0.15s ease, padding-left 0.15s ease;
 }
@@ -398,6 +405,31 @@ textarea {
 .prompt-btn:hover {
   color: var(--ink);
   padding-left: 0.35rem;
+}
+
+.prompt-source {
+  display: inline-block;
+  margin-right: 0.45rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.prompt-dismiss {
+  flex-shrink: 0;
+  margin-top: 0.85rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.prompt-dismiss:hover {
+  color: var(--ink);
 }
 
 .composer {

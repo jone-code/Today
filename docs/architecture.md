@@ -192,12 +192,15 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 
 #### `proactive` — 主动关联（产品核心）
 
-- **负责：** 结合近期 checkin + memories，生成今日开场/追问（最多 N 条）。
+- **负责：** 结合近期 checkin + memories，生成今日开场/追问（最多 N 条）；记录展示/选择/忽略/已回答，避免重复追问。
 - **不负责：** 改写用户日记、写记忆。
 - **核心 API：**
   - `GET /v1/proactive/today`
+  - `POST /v1/proactive/prompts/:id/select`
+  - `POST /v1/proactive/prompts/:id/dismiss`
 - **依赖：** `ai-gateway` + memory 检索 + 近 N 日 checkin
-- **规则：** 无模型时可用规则降级；有模型时「检索候选 → LLM 挑选/润色」。
+- **数据：** `proactive_prompt_events`（fingerprint + status）
+- **规则：** 无模型时可用规则降级；有模型时「候选追问 + 检索记忆 → LLM 挑选/润色」；打卡正文可关闭开放追问。
 
 #### `ai-gateway` — AI 基础设施（支撑模块）
 
@@ -290,6 +293,7 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 11. ✅ 记忆可管理（编辑 / 归档 / 删除；主动回忆排除已归档）
 12. ✅ 向量库外挂（`VectorStore`：mysql 默认 / qdrant 可选 + 回退；见 `docs/vector-store.md`）
 13. ✅ e2e 冒烟（登录→打卡→记忆；`npm run e2e:smoke`）
+14. ✅ 主动关联变真（跨日追问候选、指纹去重、已回答/忽略抑制、选择填脚手架；见 `proactive_prompt_events`）
 
 ---
 

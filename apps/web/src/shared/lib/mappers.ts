@@ -77,7 +77,16 @@ export function mapMemoryDtoToMemoryItem(m: MemoryDto): MemoryItem {
 export function mapPromptDtoToPrompt(p: ProactivePromptDto): ProactivePrompt {
   const relatedDate =
     p.relatedDate && typeof p.relatedDate === "string" ? p.relatedDate : undefined;
-  return { id: p.id, text: p.text, relatedDate };
+  return { id: p.id, text: p.text, relatedDate, source: p.source };
+}
+
+/** 点选追问时填入「回答脚手架」，而不是把问题原文贴进日记 */
+export function answerScaffoldForPrompt(p: ProactivePrompt): string {
+  if (/面试/.test(p.text)) return "面试结果：";
+  if (/计划|进展|安排/.test(p.text)) return "今天进展：";
+  if (/累|疲惫/.test(p.text)) return "关于最近的状态：";
+  if (/记得/.test(p.text)) return "今天的变化：";
+  return "";
 }
 
 /** 仅显式开启时允许未登录本地 demo；默认强制走 API */

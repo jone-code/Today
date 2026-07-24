@@ -1,5 +1,11 @@
 "use client";
 
+import { useState } from "react";
+import {
+  apiDismissProactivePrompt,
+  apiSelectProactivePrompt,
+} from "@/shared/lib/api-client";
+import { answerScaffoldForPrompt } from "@/shared/lib/mappers";
 import type { ProactivePrompt } from "@/shared/lib/types";
 
 export function ProactivePromptList({
@@ -7,28 +13,61 @@ export function ProactivePromptList({
   onSelect,
 }: {
   prompts: ProactivePrompt[];
-  onSelect?: (prompt: ProactivePrompt) => void;
+  onSelect?: (prompt: ProactivePrompt, scaffold: string) => void;
 }) {
-  if (prompts.length === 0) return null;
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const visible = prompts.filter((p) => !hidden.has(p.id));
+  if (visible.length === 0) return null;
+
+  const select = async (p: ProactivePrompt) => {
+    setBusyId(p.id);
+    try {
+      await apiSelectProactivePrompt(p.id).catch(() => undefined);
+      onSelect?.(p, answerScaffoldForPrompt(p));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const dismiss = async (p: ProactivePrompt) => {
+    setBusyId(p.id);
+    try {
+      await apiDismissProactivePrompt(p.id).catch(() => undefined);
+      setHidden((prev) => new Set(prev).add(p.id));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <div className="prompt-list reveal">
       <p className="prompt-label">我记得这些，想从哪一句说起？</p>
-      {prompts.map((p) =>
-        onSelect ? (
+      {visible.map((p) => (
+        <div key={p.id} className="prompt-row">
           <button
-            key={p.id}
             type="button"
             className="prompt-line prompt-btn"
-            onClick={() => onSelect(p)}
+            disabled={busyId === p.id}
+            onClick={() => void select(p)}
           >
+            {p.source === "followup" ? (
+              <span className="prompt-source">追问</span>
+            ) : null}
             {p.text}
           </button>
-        ) : (
-          <p key={p.id} className="prompt-line">
-            {p.text}
-          </p>
-        ),
-      )}
+          <button
+            type="button"
+            className="prompt-dismiss"
+            disabled={busyId === p.id}
+            onClick={() => void dismiss(p)}
+            aria-label="先不聊这个"
+          >
+            忽略
+          </button>
+        </div>
+      ))}
     </div>
   );
 }

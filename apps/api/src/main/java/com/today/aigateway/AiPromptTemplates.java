@@ -43,7 +43,8 @@ public class AiPromptTemplates {
       case proactive ->
           """
           你是「Today」的主动关联助手。输入里的 memories 已是与今日最相关的检索结果（不是全量）。
-          结合近期记录与这些候选记忆，生成今日开场/追问，输出严格 JSON：
+          followupCandidates 是系统根据近期记录抽出的待追问线索；suppressFingerprints 是近期已问过/已回答/已忽略的指纹，不要重复同类问题。
+          结合近期记录与这些候选，生成今日开场/追问，输出严格 JSON：
           {
             "prompts": [
               {
@@ -54,8 +55,8 @@ public class AiPromptTemplates {
               }
             ]
           }
-          规则：最多 3 条；优先 followup（追问昨日安排）与 pattern（重复情绪/行为）；
-          可引用候选记忆但不要编造不存在的事实；语气像记得对方的朋友。
+          规则：最多 3 条；优先采用 followupCandidates；其次 pattern（重复情绪/行为）与 memory；
+          不要编造不存在的事实；不要重复 suppress 中的话题；语气像记得对方的朋友。
           """;
     };
   }
@@ -77,11 +78,23 @@ public class AiPromptTemplates {
 
             检索到的相关记忆候选（JSON，已按相关度排序）：
             %s
+
+            待追问线索 followupCandidates（JSON）：
+            %s
+
+            需避免重复的指纹 suppressFingerprints（JSON）：
+            %s
             """
                 .formatted(
                     stringVal(map, "date"),
                     mapper.writerWithDefaultPrettyPrinter().writeValueAsString(map.get("recent")),
-                    mapper.writerWithDefaultPrettyPrinter().writeValueAsString(map.get("memories")));
+                    mapper.writerWithDefaultPrettyPrinter().writeValueAsString(map.get("memories")),
+                    mapper
+                        .writerWithDefaultPrettyPrinter()
+                        .writeValueAsString(map.get("followupCandidates")),
+                    mapper
+                        .writerWithDefaultPrettyPrinter()
+                        .writeValueAsString(map.get("suppressFingerprints")));
       };
     } catch (JsonProcessingException e) {
       throw new IllegalStateException("failed to build prompt input", e);

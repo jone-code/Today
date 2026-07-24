@@ -214,12 +214,14 @@ export function buildProactivePrompts(
         id: "followup-interview",
         text: "昨天提到今天有面试，结果怎么样？",
         relatedDate: yesterday,
+        source: "followup",
       });
     } else {
       prompts.push({
         id: "followup-plan",
         text: "昨天你提到了今天的计划，现在进展如何？",
         relatedDate: yesterday,
+        source: "followup",
       });
     }
   }
@@ -235,6 +237,7 @@ export function buildProactivePrompts(
     prompts.push({
       id: "pattern-tired",
       text: `最近两周你已经有 ${tiredCount} 天提到“累”，我在陪你留意这件事。`,
+      source: "pattern",
     });
   }
 
@@ -243,6 +246,7 @@ export function buildProactivePrompts(
     prompts.push({
       id: `memory-${topMemory.id}`,
       text: `我还记得：${topMemory.text}。今天有没有新的变化？`,
+      source: "memory",
     });
   }
 
@@ -250,6 +254,7 @@ export function buildProactivePrompts(
     prompts.push({
       id: "gentle-checkin",
       text: "我在这里。用几句话留下今天就好。",
+      source: "gentle",
     });
   }
 

@@ -34,6 +34,7 @@ export type ProactivePrompt = {
   id: string;
   text: string;
   relatedDate?: string;
+  source?: "followup" | "pattern" | "memory" | "gentle";
 };
 
 /** 主链路保存阶段（UI 状态机） */

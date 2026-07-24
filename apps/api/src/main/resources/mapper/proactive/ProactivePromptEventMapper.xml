@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.today.proactive.ProactivePromptEventMapper">
+
+  <resultMap id="EventMap" type="com.today.persistence.ProactivePromptEventEntity">
+    <id property="id" column="id"/>
+    <result property="userId" column="user_id"/>
+    <result property="promptDate" column="prompt_date"/>
+    <result property="promptId" column="prompt_id"/>
+    <result property="fingerprint" column="fingerprint"/>
+    <result property="source" column="source"/>
+    <result property="promptText" column="prompt_text"/>
+    <result property="relatedDate" column="related_date"/>
+    <result property="status" column="status"/>
+    <result property="createdAt" column="created_at"/>
+    <result property="updatedAt" column="updated_at"/>
+  </resultMap>
+
+  <insert id="upsert">
+    INSERT INTO proactive_prompt_events (
+      id, user_id, prompt_date, prompt_id, fingerprint, source, prompt_text,
+      related_date, status, created_at, updated_at
+    ) VALUES (
+      #{id}, #{userId}, #{promptDate}, #{promptId}, #{fingerprint}, #{source}, #{promptText},
+      #{relatedDate}, #{status}, #{createdAt}, #{updatedAt}
+    )
+    ON DUPLICATE KEY UPDATE
+      prompt_id = VALUES(prompt_id),
+      source = VALUES(source),
+      prompt_text = VALUES(prompt_text),
+      related_date = VALUES(related_date),
+      status = IF(status IN ('answered', 'dismissed', 'selected'), status, VALUES(status)),
+      updated_at = VALUES(updated_at)
+  </insert>
+
+  <update id="updateStatus">
+    UPDATE proactive_prompt_events
+    SET status = #{status}, updated_at = #{updatedAt}
+    WHERE user_id = #{userId} AND fingerprint = #{fingerprint}
+      AND status NOT IN ('answered')
+  </update>
+
+  <update id="updateStatusByPromptIdAndDate">
+    UPDATE proactive_prompt_events
+    SET status = #{status}, updated_at = #{updatedAt}
+    WHERE user_id = #{userId}
+      AND prompt_id = #{promptId}
+      AND prompt_date = #{promptDate}
+      AND status NOT IN ('answered')
+  </update>
+
+  <select id="listByUserSince" resultMap="EventMap">
+    SELECT id, user_id, prompt_date, prompt_id, fingerprint, source, prompt_text,
+           related_date, status, created_at, updated_at
+    FROM proactive_prompt_events
+    WHERE user_id = #{userId} AND prompt_date &gt;= #{since}
+    ORDER BY updated_at DESC
+  </select>
+
+  <select id="listOpenFollowups" resultMap="EventMap">
+    SELECT id, user_id, prompt_date, prompt_id, fingerprint, source, prompt_text,
+           related_date, status, created_at, updated_at
+    FROM proactive_prompt_events
+    WHERE user_id = #{userId}
+      AND source = 'followup'
+      AND status IN ('shown', 'selected')
+    ORDER BY prompt_date DESC
+  </select>
+
+  <select id="findByUserFingerprintDate" resultMap="EventMap">
+    SELECT id, user_id, prompt_date, prompt_id, fingerprint, source, prompt_text,
+           related_date, status, created_at, updated_at
+    FROM proactive_prompt_events
+    WHERE user_id = #{userId}
+      AND fingerprint = #{fingerprint}
+      AND prompt_date = #{promptDate}
+    LIMIT 1
+  </select>
+</mapper>

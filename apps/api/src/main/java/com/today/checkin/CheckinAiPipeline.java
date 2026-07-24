@@ -1,13 +1,14 @@
 package com.today.checkin;
 
 import com.today.memory.MemoryService;
+import com.today.proactive.ProactiveService;
 import com.today.summary.SummaryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-/** checkin 提交后的 AI 慢路径：summary → memory（含 embedding） */
+/** checkin 提交后的 AI 慢路径：summary → memory → 关闭已回应追问 */
 @Service
 public class CheckinAiPipeline {
 
@@ -15,10 +16,13 @@ public class CheckinAiPipeline {
 
   private final SummaryService summaries;
   private final MemoryService memories;
+  private final ProactiveService proactive;
 
-  public CheckinAiPipeline(SummaryService summaries, MemoryService memories) {
+  public CheckinAiPipeline(
+      SummaryService summaries, MemoryService memories, ProactiveService proactive) {
     this.summaries = summaries;
     this.memories = memories;
+    this.proactive = proactive;
   }
 
   @Async("aiTaskExecutor")
@@ -27,6 +31,7 @@ public class CheckinAiPipeline {
     try {
       summaries.generateForCheckin(userId, checkinId, date, rawText);
       memories.upsertFromCheckin(userId, rawText);
+      proactive.markAnsweredFromCheckin(userId, date, rawText);
       log.info(
           "checkin ai pipeline ok userId={} checkinId={} elapsedMs={}",
           userId,
@@ -48,5 +53,6 @@ public class CheckinAiPipeline {
       String userId, String checkinId, String date, String rawText) {
     summaries.generateForCheckin(userId, checkinId, date, rawText);
     memories.upsertFromCheckin(userId, rawText);
+    proactive.markAnsweredFromCheckin(userId, date, rawText);
   }
 }

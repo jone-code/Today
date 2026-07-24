@@ -22,6 +22,8 @@ export const ApiRoutes = {
   memoryUnarchive: "/v1/memories/:id/unarchive",
   timeline: "/v1/timeline",
   proactiveToday: "/v1/proactive/today",
+  proactiveSelect: "/v1/proactive/prompts/:id/select",
+  proactiveDismiss: "/v1/proactive/prompts/:id/dismiss",
   reminders: "/v1/reminders",
   reminderById: "/v1/reminders/:id",
   reminderDeliveries: "/v1/reminders/deliveries",

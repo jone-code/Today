@@ -8,7 +8,7 @@ import com.today.persistence.MemoryEntity;
 import com.today.summary.DaySummaryDto;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 
 public final class EntityMapper {
 
@@ -58,6 +58,7 @@ public final class EntityMapper {
   }
 
   public static LocalDate todayUtc() {
-    return LocalDate.now(ZoneOffset.UTC);
+    // 产品日界按中国时区（与提醒默认 timezone 一致）
+    return LocalDate.now(ZoneId.of("Asia/Shanghai"));
   }
 }

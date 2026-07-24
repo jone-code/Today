@@ -282,6 +282,22 @@ export async function apiGetProactiveToday(): Promise<ProactiveTodayDto> {
   return requestJson("/v1/proactive/today");
 }
 
+export async function apiSelectProactivePrompt(
+  id: string,
+): Promise<ProactivePromptDto> {
+  return requestJson(`/v1/proactive/prompts/${encodeURIComponent(id)}/select`, {
+    method: "POST",
+  });
+}
+
+export async function apiDismissProactivePrompt(
+  id: string,
+): Promise<ProactivePromptDto> {
+  return requestJson(`/v1/proactive/prompts/${encodeURIComponent(id)}/dismiss`, {
+    method: "POST",
+  });
+}
+
 export async function apiGetTimeline(limit = 30): Promise<TimelinePageDto> {
   return requestJson(`/v1/timeline?limit=${encodeURIComponent(String(limit))}`);
 }
