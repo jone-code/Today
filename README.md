@@ -111,7 +111,8 @@ npm install
 
 # MySQL（Docker）
 npm run db:up
-# 若是旧库，再执行 apps/api/src/main/resources/db/migration-auth-reminder.sql
+# 旧库增量迁移（幂等）
+npm run db:migrate
 
 # 后端 Spring Boot
 npm run dev:api

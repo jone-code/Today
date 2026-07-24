@@ -102,7 +102,13 @@ npm run dev:api
 - Todos：`GET/POST /v1/todos`，`PUT/DELETE /v1/todos/{id}`，`POST /v1/todos/{id}/toggle`
 - Punch：`GET/POST /v1/punch/habits`，`PUT/DELETE /v1/punch/habits/{id}`，`POST/DELETE /v1/punch/habits/{id}/punch`
 
-已有库迁移（按需执行）：
+已有库迁移（推荐一键，幂等）：
+
+```bash
+npm run db:migrate
+```
+
+或按需手动执行：
 
 - `src/main/resources/db/migration-auth-reminder.sql`
 - `src/main/resources/db/migration-memory-embedding.sql`
