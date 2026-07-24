@@ -10,9 +10,12 @@ public interface MemoryMapper {
 
   MemoryEntity findById(@Param("id") String id);
 
-  List<MemoryEntity> listByUserId(@Param("userId") String userId);
+  List<MemoryEntity> listByUserId(
+      @Param("userId") String userId, @Param("includeArchived") boolean includeArchived);
 
   int insert(MemoryEntity entity);
 
   int update(MemoryEntity entity);
+
+  int deleteById(@Param("id") String id, @Param("userId") String userId);
 }

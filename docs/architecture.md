@@ -281,8 +281,9 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 8. ✅ 接入 TanStack Query；默认强制走 API（本地 fallback 需 `NEXT_PUBLIC_ALLOW_LOCAL_FALLBACK=true`）
 9. ✅ Todo / 习惯打卡合入 `apps/api` + `apps/web` features
 10. ✅ 主链路体验：checkin 整理中状态 / 失败重试 / 保存后刷新时间轴·记忆·主动关联；追问一点即填
-11. 记忆可管理（编辑 / 归档 / 删除）
+11. ✅ 记忆可管理（编辑 / 归档 / 删除；主动回忆排除已归档）
 12. 向量库外挂（记忆量上来后再考虑）
+13. e2e 冒烟（登录→打卡→记忆）
 
 ---
 

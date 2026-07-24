@@ -34,7 +34,11 @@ export function loadMemories(): MemoryItem[] {
   try {
     const raw = localStorage.getItem(MEMORIES_KEY);
     if (!raw) return [];
-    return JSON.parse(raw) as MemoryItem[];
+    const parsed = JSON.parse(raw) as MemoryItem[];
+    return parsed.map((m) => ({
+      ...m,
+      archived: Boolean(m.archived),
+    }));
   } catch {
     return [];
   }

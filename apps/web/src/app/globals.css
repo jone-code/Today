@@ -586,8 +586,20 @@ textarea {
 }
 
 .memory-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
   padding: 0.85rem 0;
   border-top: 1px solid var(--line);
+}
+
+.memory-item.is-archived {
+  opacity: 0.65;
+}
+
+.memory-body {
+  min-width: 0;
+  flex: 1;
 }
 
 .memory-cat {
@@ -609,6 +621,56 @@ textarea {
 .memory-strength {
   color: var(--ink-soft);
   font-size: 0.85rem;
+}
+
+.memory-edit {
+  display: grid;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.memory-edit label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.memory-edit textarea,
+.memory-edit select {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+}
+
+.memory-edit-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.memory-edit-actions .text-btn {
+  margin-top: 0;
+}
+
+.memory-item .module-actions .text-btn {
+  margin-top: 0;
+}
+
+@media (max-width: 640px) {
+  .memory-item {
+    flex-direction: column;
+  }
+
+  .memory-item .module-actions {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+  }
 }
 
 .empty-state p {

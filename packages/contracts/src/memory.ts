@@ -18,10 +18,18 @@ export const MemoryDtoSchema = z.object({
   category: MemoryCategorySchema,
   text: z.string(),
   strength: z.number().int().min(1),
+  archived: z.boolean(),
   updatedAt: z.string().datetime(),
 });
 
 export type MemoryDto = z.infer<typeof MemoryDtoSchema>;
+
+export const MemoryUpdateRequestSchema = z.object({
+  text: z.string().min(1).max(512).optional(),
+  category: MemoryCategorySchema.optional(),
+});
+
+export type MemoryUpdateRequest = z.infer<typeof MemoryUpdateRequestSchema>;
 
 export const MemoryListDtoSchema = z.object({
   items: z.array(MemoryDtoSchema),

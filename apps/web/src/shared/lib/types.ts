@@ -26,6 +26,7 @@ export type MemoryItem = {
   text: string;
   category: "work" | "health" | "learning" | "life" | "emotion" | "goal";
   strength: number;
+  archived: boolean;
   updatedAt: string;
 };
 

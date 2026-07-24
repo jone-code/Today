@@ -15,8 +15,10 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class MemoryService {
@@ -35,18 +37,20 @@ public class MemoryService {
     this.identity = identity;
   }
 
-  public List<MemoryDto> list() {
-    return memoryMapper.listByUserId(identity.getCurrentUserId()).stream()
+  public List<MemoryDto> list(boolean includeArchived) {
+    return memoryMapper.listByUserId(identity.getCurrentUserId(), includeArchived).stream()
         .map(EntityMapper::toDto)
         .toList();
   }
 
-  /**
-   * 按 query 检索最相关记忆：有 embedding 走余弦相似度，否则按 strength 降级。
-   */
+  public List<MemoryDto> list() {
+    return list(false);
+  }
+
+  /** 按 query 检索最相关记忆（默认排除已归档） */
   public List<MemoryDto> retrieveRelevant(String queryText, int topK) {
     String userId = identity.getCurrentUserId();
-    List<MemoryEntity> all = memoryMapper.listByUserId(userId);
+    List<MemoryEntity> all = memoryMapper.listByUserId(userId, false);
     if (all.isEmpty()) {
       return List.of();
     }
@@ -75,6 +79,50 @@ public class MemoryService {
     }
 
     return all.stream().limit(limit).map(EntityMapper::toDto).toList();
+  }
+
+  @Transactional
+  public MemoryDto update(String id, MemoryUpdateRequest body) {
+    MemoryEntity entity = requireOwned(id);
+    boolean textChanged = false;
+    if (body.getText() != null) {
+      String text = body.getText().trim();
+      if (text.isEmpty()) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "memory text is blank");
+      }
+      if (text.length() > 512) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "memory text too long");
+      }
+      textChanged = !text.equals(entity.getMemoryText());
+      entity.setMemoryText(text);
+    }
+    if (body.getCategory() != null) {
+      entity.setCategory(body.getCategory().name());
+    }
+    entity.setUpdatedAt(EntityMapper.now());
+    if (textChanged) {
+      entity.setEmbeddingJson(null);
+      memoryMapper.update(entity);
+      backfillEmbeddings(List.of(entity), entity.getUpdatedAt());
+    } else {
+      memoryMapper.update(entity);
+    }
+    return EntityMapper.toDto(requireOwned(id));
+  }
+
+  @Transactional
+  public MemoryDto archive(String id, boolean archived) {
+    MemoryEntity entity = requireOwned(id);
+    entity.setArchived(archived);
+    entity.setUpdatedAt(EntityMapper.now());
+    memoryMapper.update(entity);
+    return EntityMapper.toDto(entity);
+  }
+
+  @Transactional
+  public void delete(String id) {
+    requireOwned(id);
+    memoryMapper.deleteById(id, identity.getCurrentUserId());
   }
 
   @Transactional
@@ -114,11 +162,13 @@ public class MemoryService {
         created.setCategory(item.category().name());
         created.setMemoryText(text);
         created.setStrength(1);
+        created.setArchived(false);
         created.setUpdatedAt(now);
         memoryMapper.insert(created);
         needEmbed.add(created);
       } else {
         existing.setStrength(existing.getStrength() + 1);
+        existing.setArchived(false);
         existing.setUpdatedAt(now);
         if (existing.getEmbeddingJson() == null || existing.getEmbeddingJson().isBlank()) {
           needEmbed.add(existing);
@@ -129,7 +179,15 @@ public class MemoryService {
     }
 
     backfillEmbeddings(needEmbed, now);
-    return memoryMapper.listByUserId(userId).stream().map(EntityMapper::toDto).toList();
+    return memoryMapper.listByUserId(userId, false).stream().map(EntityMapper::toDto).toList();
+  }
+
+  private MemoryEntity requireOwned(String id) {
+    MemoryEntity entity = memoryMapper.findById(id);
+    if (entity == null || !identity.getCurrentUserId().equals(entity.getUserId())) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "memory not found");
+    }
+    return entity;
   }
 
   private void backfillEmbeddings(List<MemoryEntity> entities, Instant now) {
