@@ -134,6 +134,11 @@ npm run e2e:smoke
 # 仅 API：npm run e2e:smoke:api
 ```
 
-向量库说明见 [`docs/vector-store.md`](docs/vector-store.md)。
+向量库说明见 [`docs/vector-store.md`](docs/vector-store.md)。切换 Qdrant 后可对存量记忆执行：
 
-当前状态：**前端已迁入 `apps/web` 并接入 TanStack Query**；Todo / 习惯打卡已落地；默认强制登录走 API；`aigateway` 已接通 OpenAI 兼容 LLM + Embedding 检索；checkin AI 流水线异步；记忆可管理；e2e 冒烟可用；向量检索可外挂 Qdrant。
+```bash
+TODAY_AUTH_TOKEN=<jwt> FILL_MISSING=true npm run vector:reindex
+# 全量重建：SCOPE=all RECREATE=true FILL_MISSING=true npm run vector:reindex
+```
+
+当前状态：**前端已迁入 `apps/web` 并接入 TanStack Query**；Todo / 习惯打卡已落地；默认强制登录走 API；`aigateway` 已接通 OpenAI 兼容 LLM + Embedding 检索；checkin AI 流水线异步；记忆可管理；e2e 冒烟可用；向量检索可外挂 Qdrant 并可 reindex。

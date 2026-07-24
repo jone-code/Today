@@ -24,6 +24,8 @@ export const ApiRoutes = {
   proactiveToday: "/v1/proactive/today",
   proactiveSelect: "/v1/proactive/prompts/:id/select",
   proactiveDismiss: "/v1/proactive/prompts/:id/dismiss",
+  memoriesReindex: "/v1/memories/reindex",
+  adminVectorReindex: "/v1/admin/vector/reindex",
   reminders: "/v1/reminders",
   reminderById: "/v1/reminders/:id",
   reminderDeliveries: "/v1/reminders/deliveries",

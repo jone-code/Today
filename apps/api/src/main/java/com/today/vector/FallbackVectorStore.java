@@ -72,4 +72,38 @@ public class FallbackVectorStore implements VectorStore {
     }
     return fallback.search(userId, query, topK);
   }
+
+  @Override
+  public VectorHealth health() {
+    VectorHealth primaryHealth = primary.health();
+    if (primaryHealth.ok()) {
+      return new VectorHealth(
+          provider(),
+          true,
+          primaryHealth.detail(),
+          primaryHealth.collectionExists(),
+          primaryHealth.pointsCount(),
+          primaryHealth.configuredDimensions(),
+          primaryHealth.actualDimensions());
+    }
+    VectorHealth fb = fallback.health();
+    return new VectorHealth(
+        provider(),
+        fb.ok(),
+        "primary: " + primaryHealth.detail() + "; fallback: " + fb.detail(),
+        primaryHealth.collectionExists(),
+        primaryHealth.pointsCount(),
+        primaryHealth.configuredDimensions(),
+        primaryHealth.actualDimensions());
+  }
+
+  @Override
+  public boolean recreateIndex() {
+    try {
+      return primary.recreateIndex();
+    } catch (Exception e) {
+      log.warn("vector recreateIndex primary failed reason={}", e.toString());
+      return false;
+    }
+  }
 }

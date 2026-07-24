@@ -20,6 +20,12 @@ public class VectorProperties {
 
   private int timeoutMs = 5000;
 
+  /**
+   * 全量 reindex 管理口令；非空时 {@code POST /v1/admin/vector/reindex} 需匹配
+   * 请求头 {@code X-Today-Admin-Token}。
+   */
+  private String adminToken = "";
+
   public String getProvider() {
     return provider;
   }
@@ -68,7 +74,19 @@ public class VectorProperties {
     this.timeoutMs = timeoutMs;
   }
 
+  public String getAdminToken() {
+    return adminToken;
+  }
+
+  public void setAdminToken(String adminToken) {
+    this.adminToken = adminToken;
+  }
+
   public boolean isQdrant() {
     return "qdrant".equalsIgnoreCase(provider);
+  }
+
+  public boolean hasAdminToken() {
+    return adminToken != null && !adminToken.isBlank();
   }
 }

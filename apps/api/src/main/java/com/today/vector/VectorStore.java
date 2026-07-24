@@ -7,7 +7,7 @@ package com.today.vector;
  */
 public interface VectorStore {
 
-  /** mysql | qdrant */
+  /** mysql | qdrant | qdrant+fallback:mysql */
   String provider();
 
   void upsert(MemoryVectorRecord record);
@@ -25,4 +25,18 @@ public interface VectorStore {
    * @return 空列表表示无命中或不可用（调用方应降级）
    */
   java.util.List<ScoredMemoryId> search(String userId, float[] query, int topK);
+
+  /** 运维健康检查 */
+  default VectorHealth health() {
+    return new VectorHealth(provider(), true, "ok", null, null, null, null);
+  }
+
+  /**
+   * 重建索引结构（如删除并重建 Qdrant collection）。mysql 实现 no-op。
+   *
+   * @return true 若执行了重建
+   */
+  default boolean recreateIndex() {
+    return false;
+  }
 }

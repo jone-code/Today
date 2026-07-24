@@ -206,6 +206,94 @@ public class QdrantClient {
     return out;
   }
 
+  public boolean ping() {
+    try {
+      restClient.get().uri("/readyz").headers(this::auth).retrieve().toBodilessEntity();
+      return true;
+    } catch (Exception e) {
+      try {
+        restClient.get().uri("/").headers(this::auth).retrieve().toBodilessEntity();
+        return true;
+      } catch (Exception e2) {
+        return false;
+      }
+    }
+  }
+
+  /** @return configured collection vector size, or null if missing / unreadable */
+  public Integer collectionVectorSize() {
+    if (!collectionExists()) {
+      return null;
+    }
+    try {
+      JsonNode response =
+          restClient
+              .get()
+              .uri("/collections/{name}", properties.getCollection())
+              .headers(this::auth)
+              .retrieve()
+              .body(JsonNode.class);
+      if (response == null) return null;
+      JsonNode size = response.path("result").path("config").path("params").path("vectors").path("size");
+      if (size.isMissingNode() || !size.canConvertToInt()) {
+        // named vectors fallback
+        size = response.path("result").path("config").path("params").path("vectors");
+        if (size.isObject()) {
+          var fields = size.fields();
+          if (fields.hasNext()) {
+            size = fields.next().getValue().path("size");
+          }
+        }
+      }
+      return size.canConvertToInt() ? size.asInt() : null;
+    } catch (Exception e) {
+      log.warn("qdrant collection info failed reason={}", e.toString());
+      return null;
+    }
+  }
+
+  public long countPoints() {
+    if (!collectionExists()) {
+      return 0;
+    }
+    try {
+      ObjectNode body = mapper.createObjectNode();
+      body.put("exact", false);
+      JsonNode response =
+          restClient
+              .post()
+              .uri("/collections/{name}/points/count", properties.getCollection())
+              .contentType(MediaType.APPLICATION_JSON)
+              .headers(this::auth)
+              .body(body)
+              .retrieve()
+              .body(JsonNode.class);
+      if (response == null) return 0;
+      return response.path("result").path("count").asLong(0);
+    } catch (Exception e) {
+      log.warn("qdrant count failed reason={}", e.toString());
+      return 0;
+    }
+  }
+
+  public void deleteCollection() {
+    if (!collectionExists()) {
+      return;
+    }
+    restClient
+        .delete()
+        .uri("/collections/{name}", properties.getCollection())
+        .headers(this::auth)
+        .retrieve()
+        .toBodilessEntity();
+    log.info("qdrant collection deleted name={}", properties.getCollection());
+  }
+
+  public void recreateCollection() {
+    deleteCollection();
+    ensureCollection();
+  }
+
   private void auth(org.springframework.http.HttpHeaders headers) {
     String key = properties.getApiKey();
     if (key != null && !key.isBlank()) {

@@ -12,6 +12,7 @@
     "dev:api": "cd apps/api && mvn spring-boot:run",
     "db:up": "docker compose up -d mysql",
     "vector:up": "docker compose up -d qdrant",
+    "vector:reindex": "bash scripts/vector-reindex.sh",
     "db:down": "docker compose down",
     "build": "npm run build -w @today/web",
     "build:api": "cd apps/api && mvn -q package -DskipTests",

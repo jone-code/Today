@@ -18,4 +18,13 @@ public interface MemoryMapper {
   int update(MemoryEntity entity);
 
   int deleteById(@Param("id") String id, @Param("userId") String userId);
+
+  int countWithEmbedding();
+
+  int countAll();
+
+  List<MemoryEntity> listPage(@Param("limit") int limit, @Param("offset") int offset);
+
+  List<MemoryEntity> listPageByUserId(
+      @Param("userId") String userId, @Param("limit") int limit, @Param("offset") int offset);
 }

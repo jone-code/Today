@@ -10,9 +10,11 @@ public class QdrantVectorStore implements VectorStore {
   private static final Logger log = LoggerFactory.getLogger(QdrantVectorStore.class);
 
   private final QdrantClient client;
+  private final VectorProperties properties;
 
-  public QdrantVectorStore(QdrantClient client) {
+  public QdrantVectorStore(QdrantClient client, VectorProperties properties) {
     this.client = client;
+    this.properties = properties;
   }
 
   @Override
@@ -58,5 +60,46 @@ public class QdrantVectorStore implements VectorStore {
   @Override
   public List<ScoredMemoryId> search(String userId, float[] query, int topK) {
     return client.search(userId, query, topK);
+  }
+
+  @Override
+  public VectorHealth health() {
+    if (!client.ping()) {
+      return VectorHealth.unavailable("qdrant", "unreachable: " + properties.getQdrantUrl());
+    }
+    boolean exists = false;
+    try {
+      exists = client.collectionExists();
+    } catch (Exception e) {
+      return VectorHealth.unavailable("qdrant", "collection check failed: " + e.getMessage());
+    }
+    Integer actual = exists ? client.collectionVectorSize() : null;
+    long points = exists ? client.countPoints() : 0;
+    boolean dimOk =
+        actual == null || actual.intValue() == properties.getDimensions();
+    String detail =
+        !exists
+            ? "collection missing (will create on first upsert)"
+            : dimOk
+                ? "ok"
+                : "dimension mismatch: collection="
+                    + actual
+                    + " configured="
+                    + properties.getDimensions()
+                    + " (reindex with recreate=true)";
+    return new VectorHealth(
+        "qdrant",
+        dimOk,
+        detail,
+        exists,
+        points,
+        properties.getDimensions(),
+        actual);
+  }
+
+  @Override
+  public boolean recreateIndex() {
+    client.recreateCollection();
+    return true;
   }
 }

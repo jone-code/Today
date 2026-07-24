@@ -72,4 +72,10 @@ public class MysqlJsonVectorStore implements VectorStore {
         .limit(limit)
         .toList();
   }
+
+  @Override
+  public VectorHealth health() {
+    long withEmbedding = memoryMapper.countWithEmbedding();
+    return VectorHealth.mysqlOk(withEmbedding);
+  }
 }
