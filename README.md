@@ -124,4 +124,11 @@ npm run dev:web
 - Web: [http://localhost:3000](http://localhost:3000)（`/login` `/register` `/app` `/app/todos` `/app/punch` `/app/reminders`）
 - API health: [http://localhost:3001/health](http://localhost:3001/health)
 
-当前状态：**前端已迁入 `apps/web` 并接入 TanStack Query**；Todo / 习惯打卡已落地；默认强制登录走 API；`aigateway` 已接通 OpenAI 兼容 LLM + Embedding 检索；checkin AI 流水线异步。
+```bash
+# 冒烟：登录 → 打卡 → 记忆（自动拉起 API/Web 若未运行）
+npx playwright install chromium   # 首次
+npm run e2e:smoke
+# 仅 API：npm run e2e:smoke:api
+```
+
+当前状态：**前端已迁入 `apps/web` 并接入 TanStack Query**；Todo / 习惯打卡已落地；默认强制登录走 API；`aigateway` 已接通 OpenAI 兼容 LLM + Embedding 检索；checkin AI 流水线异步；记忆可管理；e2e 冒烟可用。

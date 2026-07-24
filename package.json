@@ -18,6 +18,12 @@
     "lint": "npm run lint -w @today/web",
     "typecheck:contracts": "npm run typecheck -w @today/contracts",
     "db:migrate": "bash scripts/db-migrate.sh",
-    "db:schema": "mysql -h${MYSQL_HOST:-127.0.0.1} -P${MYSQL_PORT:-3306} -u${MYSQL_USER:-today} -p${MYSQL_PASSWORD:-today} < apps/api/src/main/resources/db/schema.sql"
+    "db:schema": "mysql -h${MYSQL_HOST:-127.0.0.1} -P${MYSQL_PORT:-3306} -u${MYSQL_USER:-today} -p${MYSQL_PASSWORD:-today} < apps/api/src/main/resources/db/schema.sql",
+    "e2e:smoke": "bash scripts/e2e-smoke.sh",
+    "e2e:smoke:api": "node scripts/e2e-smoke-api.mjs",
+    "e2e:smoke:ui": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
   }
 }
