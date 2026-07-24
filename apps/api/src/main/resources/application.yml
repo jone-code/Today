@@ -30,3 +30,11 @@ today:
     temperature: ${OPENAI_TEMPERATURE:0.3}
     retrieve-top-k: ${OPENAI_RETRIEVE_TOP_K:5}
     async-checkin: ${TODAY_AI_ASYNC_CHECKIN:true}
+  vector:
+    # mysql = 扫描 embedding_json；qdrant = 外挂向量库（失败回退 mysql）
+    provider: ${TODAY_VECTOR_PROVIDER:mysql}
+    qdrant-url: ${TODAY_QDRANT_URL:http://127.0.0.1:6333}
+    collection: ${TODAY_QDRANT_COLLECTION:today_memories}
+    dimensions: ${TODAY_VECTOR_DIMENSIONS:1536}
+    api-key: ${TODAY_QDRANT_API_KEY:}
+    timeout-ms: ${TODAY_QDRANT_TIMEOUT_MS:5000}

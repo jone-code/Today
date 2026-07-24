@@ -105,7 +105,7 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 | 项 | 选型 | 原因 |
 |----|------|------|
 | 主库 | **MySQL 8** | 日记、记忆、时间轴结构化数据 |
-| 向量（二期） | 独立检索服务或 MySQL 外挂向量库 | MVP 先不做语义检索 |
+| 向量 | **Qdrant**（可选外挂）+ MySQL `embedding_json` 回退 | `TODAY_VECTOR_PROVIDER=qdrant`；默认仍 mysql 扫描 |
 | 缓存/队列 | **Redis**（二期） | 主动关联扫描、异步总结 |
 | 对象存储 | S3 兼容（图片期再上） | MVP 不做图片 |
 | LLM | **OpenAI 兼容 API**（环境变量切换） | 国内/海外模型可换 |
@@ -179,8 +179,8 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 - **核心 API：**
   - `GET /v1/memories`
   - （内部）`MemoryService.upsertFromCheckin`
-- **依赖：** `ai-gateway`（抽取 + embedding）
-- **数据：** `MemoryItem`（id, userId, category, text, strength, embedding, updatedAt）
+- **依赖：** `ai-gateway`（抽取 + embedding）+ `vector`（检索索引）
+- **数据：** `MemoryItem`（id, userId, category, text, strength, embedding, archived, updatedAt）
 
 #### `timeline` — 时间轴
 
@@ -206,6 +206,12 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 - **接口示例：**
   - `complete(task: 'summary' | 'memory_extract' | 'proactive', input)`
   - `embed(texts: string[])`
+
+#### `vector` — 向量索引（支撑模块）
+
+- **负责：** 记忆向量 upsert / delete / archive 元数据 / Top-K 检索。
+- **不负责：** 生成 embedding（仍走 `ai-gateway`）；不拥有业务表。
+- **实现：** `VectorStore` — 默认 `mysql`（`embedding_json` + 余弦）；可选 `qdrant`（失败检索回退 mysql）。详见 `docs/vector-store.md`。
 
 #### `identity` — 用户注册登录
 
@@ -282,7 +288,7 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 9. ✅ Todo / 习惯打卡合入 `apps/api` + `apps/web` features
 10. ✅ 主链路体验：checkin 整理中状态 / 失败重试 / 保存后刷新时间轴·记忆·主动关联；追问一点即填
 11. ✅ 记忆可管理（编辑 / 归档 / 删除；主动回忆排除已归档）
-12. 向量库外挂（记忆量上来后再考虑）
+12. ✅ 向量库外挂（`VectorStore`：mysql 默认 / qdrant 可选 + 回退；见 `docs/vector-store.md`）
 13. ✅ e2e 冒烟（登录→打卡→记忆；`npm run e2e:smoke`）
 
 ---

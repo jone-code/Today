@@ -3,15 +3,16 @@ package com.today.memory;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.today.aigateway.AiGatewayService;
 import com.today.aigateway.AiGatewayService.AiTask;
-import com.today.aigateway.VectorMath;
 import com.today.common.EntityMapper;
 import com.today.common.JsonUtils;
 import com.today.common.MemoryCategory;
 import com.today.identity.IdentityService;
 import com.today.persistence.MemoryEntity;
+import com.today.vector.MemoryVectorRecord;
+import com.today.vector.ScoredMemoryId;
+import com.today.vector.VectorStore;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -29,12 +30,17 @@ public class MemoryService {
   private final MemoryMapper memoryMapper;
   private final AiGatewayService aiGateway;
   private final IdentityService identity;
+  private final VectorStore vectorStore;
 
   public MemoryService(
-      MemoryMapper memoryMapper, AiGatewayService aiGateway, IdentityService identity) {
+      MemoryMapper memoryMapper,
+      AiGatewayService aiGateway,
+      IdentityService identity,
+      VectorStore vectorStore) {
     this.memoryMapper = memoryMapper;
     this.aiGateway = aiGateway;
     this.identity = identity;
+    this.vectorStore = vectorStore;
   }
 
   public List<MemoryDto> list(boolean includeArchived) {
@@ -60,21 +66,19 @@ public class MemoryService {
         aiGateway.embed(List.of(queryText == null ? "" : queryText));
     if (queryEmbed.isPresent()) {
       float[] query = queryEmbed.get().get(0);
-      record Scored(MemoryEntity entity, double score) {}
-      List<Scored> scored = new ArrayList<>();
-      for (MemoryEntity entity : all) {
-        float[] vec = JsonUtils.fromJsonFloatArray(entity.getEmbeddingJson());
-        if (vec == null) {
-          continue;
+      List<ScoredMemoryId> hits = vectorStore.search(userId, query, limit);
+      if (hits != null && !hits.isEmpty()) {
+        List<MemoryDto> out = new ArrayList<>();
+        for (ScoredMemoryId hit : hits) {
+          MemoryEntity entity = memoryMapper.findById(hit.memoryId());
+          if (entity == null || entity.isArchived() || !userId.equals(entity.getUserId())) {
+            continue;
+          }
+          out.add(EntityMapper.toDto(entity));
         }
-        scored.add(new Scored(entity, VectorMath.cosineSimilarity(query, vec)));
-      }
-      if (!scored.isEmpty()) {
-        return scored.stream()
-            .sorted(Comparator.comparingDouble(Scored::score).reversed())
-            .limit(limit)
-            .map(s -> EntityMapper.toDto(s.entity()))
-            .toList();
+        if (!out.isEmpty()) {
+          return out;
+        }
       }
     }
 
@@ -106,6 +110,7 @@ public class MemoryService {
       backfillEmbeddings(List.of(entity), entity.getUpdatedAt());
     } else {
       memoryMapper.update(entity);
+      syncVectorIndex(entity);
     }
     return EntityMapper.toDto(requireOwned(id));
   }
@@ -116,13 +121,15 @@ public class MemoryService {
     entity.setArchived(archived);
     entity.setUpdatedAt(EntityMapper.now());
     memoryMapper.update(entity);
+    vectorStore.setArchived(entity.getId(), entity.getUserId(), archived);
     return EntityMapper.toDto(entity);
   }
 
   @Transactional
   public void delete(String id) {
-    requireOwned(id);
+    MemoryEntity entity = requireOwned(id);
     memoryMapper.deleteById(id, identity.getCurrentUserId());
+    vectorStore.delete(entity.getId());
   }
 
   @Transactional
@@ -174,6 +181,7 @@ public class MemoryService {
           needEmbed.add(existing);
         } else {
           memoryMapper.update(existing);
+          syncVectorIndex(existing);
         }
       }
     }
@@ -203,12 +211,35 @@ public class MemoryService {
       return;
     }
     List<float[]> vecs = vectors.get();
+    List<MemoryVectorRecord> records = new ArrayList<>();
     for (int i = 0; i < entities.size(); i++) {
       MemoryEntity entity = entities.get(i);
       entity.setEmbeddingJson(JsonUtils.toJsonFloatArray(vecs.get(i)));
       entity.setUpdatedAt(now);
       memoryMapper.update(entity);
+      records.add(toRecord(entity, vecs.get(i)));
     }
+    vectorStore.upsertAll(records);
+  }
+
+  private void syncVectorIndex(MemoryEntity entity) {
+    float[] vec = JsonUtils.fromJsonFloatArray(entity.getEmbeddingJson());
+    if (vec == null) {
+      vectorStore.setArchived(entity.getId(), entity.getUserId(), entity.isArchived());
+      return;
+    }
+    vectorStore.upsert(toRecord(entity, vec));
+  }
+
+  private static MemoryVectorRecord toRecord(MemoryEntity entity, float[] vector) {
+    return new MemoryVectorRecord(
+        entity.getId(),
+        entity.getUserId(),
+        entity.getCategory(),
+        entity.getMemoryText(),
+        entity.getStrength(),
+        entity.isArchived(),
+        vector);
   }
 
   private List<MemoryCandidate> heuristicExtract(String rawText) {
