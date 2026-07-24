@@ -1,6 +1,6 @@
 package com.today.aigateway;
 
-/** 内存向量相似度（MVP；记忆量级可控，无需独立向量库） */
+/** 向量余弦相似度（MysqlJsonVectorStore / 单测共用） */
 public final class VectorMath {
 
   private VectorMath() {}

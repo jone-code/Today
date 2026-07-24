@@ -1,6 +1,7 @@
 package com.today.health;
 
 import com.today.aigateway.AiGatewayService;
+import com.today.vector.VectorStore;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -11,9 +12,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class HealthController {
 
   private final AiGatewayService aiGateway;
+  private final VectorStore vectorStore;
 
-  public HealthController(AiGatewayService aiGateway) {
+  public HealthController(AiGatewayService aiGateway, VectorStore vectorStore) {
     this.aiGateway = aiGateway;
+    this.vectorStore = vectorStore;
   }
 
   @GetMapping("/health")
@@ -23,6 +26,7 @@ public class HealthController {
     body.put("service", "today-api");
     body.put("stack", "spring-boot");
     body.put("aiProvider", aiGateway.getActiveProvider().name());
+    body.put("vectorProvider", vectorStore.provider());
     body.put(
         "modules",
         List.of(
@@ -32,6 +36,7 @@ public class HealthController {
             "timeline",
             "proactive",
             "ai-gateway",
+            "vector",
             "identity",
             "reminder",
             "todo",

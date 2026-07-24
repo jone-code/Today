@@ -11,6 +11,7 @@
     "dev:web": "npm run dev -w @today/web",
     "dev:api": "cd apps/api && mvn spring-boot:run",
     "db:up": "docker compose up -d mysql",
+    "vector:up": "docker compose up -d qdrant",
     "db:down": "docker compose down",
     "build": "npm run build -w @today/web",
     "build:api": "cd apps/api && mvn -q package -DskipTests",

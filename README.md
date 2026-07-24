@@ -111,10 +111,12 @@ npm install
 
 # MySQL（Docker）
 npm run db:up
+# 可选：Qdrant 向量库
+npm run vector:up
 # 旧库增量迁移（幂等）
 npm run db:migrate
 
-# 后端 Spring Boot
+# 后端 Spring Boot（启用 Qdrant：TODAY_VECTOR_PROVIDER=qdrant）
 npm run dev:api
 
 # 前端
@@ -122,7 +124,8 @@ npm run dev:web
 ```
 
 - Web: [http://localhost:3000](http://localhost:3000)（`/login` `/register` `/app` `/app/todos` `/app/punch` `/app/reminders`）
-- API health: [http://localhost:3001/health](http://localhost:3001/health)
+- API health: [http://localhost:3001/health](http://localhost:3001/health)（含 `vectorProvider`）
+- Qdrant: [http://localhost:6333/dashboard](http://localhost:6333/dashboard)（可选）
 
 ```bash
 # 冒烟：登录 → 打卡 → 记忆（自动拉起 API/Web 若未运行）
@@ -131,4 +134,6 @@ npm run e2e:smoke
 # 仅 API：npm run e2e:smoke:api
 ```
 
-当前状态：**前端已迁入 `apps/web` 并接入 TanStack Query**；Todo / 习惯打卡已落地；默认强制登录走 API；`aigateway` 已接通 OpenAI 兼容 LLM + Embedding 检索；checkin AI 流水线异步；记忆可管理；e2e 冒烟可用。
+向量库说明见 [`docs/vector-store.md`](docs/vector-store.md)。
+
+当前状态：**前端已迁入 `apps/web` 并接入 TanStack Query**；Todo / 习惯打卡已落地；默认强制登录走 API；`aigateway` 已接通 OpenAI 兼容 LLM + Embedding 检索；checkin AI 流水线异步；记忆可管理；e2e 冒烟可用；向量检索可外挂 Qdrant。
