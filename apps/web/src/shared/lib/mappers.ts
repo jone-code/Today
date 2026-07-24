@@ -69,6 +69,7 @@ export function mapMemoryDtoToMemoryItem(m: MemoryDto): MemoryItem {
     text: m.text,
     category: m.category,
     strength: m.strength,
+    archived: Boolean(m.archived),
     updatedAt: m.updatedAt,
   };
 }

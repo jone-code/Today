@@ -24,3 +24,9 @@ export const punchKeys = {
   all: ["punch"] as const,
   habits: (date?: string) => [...punchKeys.all, "habits", date ?? "today"] as const,
 };
+
+export const memoryKeys = {
+  all: ["memories"] as const,
+  list: (includeArchived = false) =>
+    [...memoryKeys.all, "list", includeArchived] as const,
+};

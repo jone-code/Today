@@ -8,4 +8,5 @@ public record MemoryDto(
     MemoryCategory category,
     String text,
     int strength,
+    boolean archived,
     String updatedAt) {}

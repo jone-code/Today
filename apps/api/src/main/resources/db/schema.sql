@@ -50,10 +50,12 @@ CREATE TABLE IF NOT EXISTS memories (
   category VARCHAR(16) NOT NULL,
   memory_text VARCHAR(512) NOT NULL,
   strength INT NOT NULL DEFAULT 1,
+  archived TINYINT(1) NOT NULL DEFAULT 0,
   embedding_json LONGTEXT NULL,
   updated_at DATETIME(3) NOT NULL,
   PRIMARY KEY (id),
-  KEY idx_memories_user_strength (user_id, strength DESC, updated_at DESC)
+  KEY idx_memories_user_strength (user_id, strength DESC, updated_at DESC),
+  KEY idx_memories_user_archived (user_id, archived, strength DESC, updated_at DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS reminders (

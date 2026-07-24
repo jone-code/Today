@@ -107,6 +107,7 @@ export type MemoryDto = {
   category: "work" | "health" | "learning" | "life" | "emotion" | "goal";
   text: string;
   strength: number;
+  archived: boolean;
   updatedAt: string;
 };
 
@@ -239,8 +240,42 @@ export async function apiWaitForSummary(
     : new Error("总结还没准备好，请再试一次");
 }
 
-export async function apiGetMemories(): Promise<{ items: MemoryDto[] }> {
-  return requestJson("/v1/memories");
+export async function apiGetMemories(
+  includeArchived = false,
+): Promise<{ items: MemoryDto[] }> {
+  const q = includeArchived ? "?includeArchived=true" : "";
+  return requestJson(`/v1/memories${q}`);
+}
+
+export async function apiUpdateMemory(
+  id: string,
+  input: {
+    text?: string;
+    category?: MemoryDto["category"];
+  },
+): Promise<MemoryDto> {
+  return requestJson(`/v1/memories/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function apiArchiveMemory(id: string): Promise<MemoryDto> {
+  return requestJson(`/v1/memories/${encodeURIComponent(id)}/archive`, {
+    method: "POST",
+  });
+}
+
+export async function apiUnarchiveMemory(id: string): Promise<MemoryDto> {
+  return requestJson(`/v1/memories/${encodeURIComponent(id)}/unarchive`, {
+    method: "POST",
+  });
+}
+
+export async function apiDeleteMemory(id: string): Promise<void> {
+  await requestJson(`/v1/memories/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
 }
 
 export async function apiGetProactiveToday(): Promise<ProactiveTodayDto> {

@@ -128,8 +128,9 @@ export function updateMemoriesFromEntry(
   const next = [...memories];
   const now = entry.createdAt;
   const text = entry.rawText;
-  const candidates: Array<Omit<MemoryItem, "id" | "updatedAt" | "strength">> =
-    [];
+  const candidates: Array<
+    Omit<MemoryItem, "id" | "updatedAt" | "strength" | "archived">
+  > = [];
 
   if (/压力|加班|上线/.test(text)) {
     candidates.push({
@@ -179,6 +180,7 @@ export function updateMemoriesFromEntry(
     const existing = next.find((m) => m.id === id);
     if (existing) {
       existing.strength += 1;
+      existing.archived = false;
       existing.updatedAt = now;
     } else {
       next.push({
@@ -186,6 +188,7 @@ export function updateMemoriesFromEntry(
         text: c.text,
         category: c.category,
         strength: 1,
+        archived: false,
         updatedAt: now,
       });
     }
@@ -235,7 +238,7 @@ export function buildProactivePrompts(
     });
   }
 
-  const topMemory = memories[0];
+  const topMemory = memories.find((m) => !m.archived);
   if (topMemory && topMemory.strength >= 2 && prompts.length < 2) {
     prompts.push({
       id: `memory-${topMemory.id}`,

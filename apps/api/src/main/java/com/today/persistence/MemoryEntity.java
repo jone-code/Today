@@ -8,6 +8,7 @@ public class MemoryEntity {
   private String category;
   private String memoryText;
   private int strength;
+  private boolean archived;
   private String embeddingJson;
   private Instant updatedAt;
 
@@ -49,6 +50,14 @@ public class MemoryEntity {
 
   public void setStrength(int strength) {
     this.strength = strength;
+  }
+
+  public boolean isArchived() {
+    return archived;
+  }
+
+  public void setArchived(boolean archived) {
+    this.archived = archived;
   }
 
   public String getEmbeddingJson() {

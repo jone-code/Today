@@ -18,7 +18,8 @@ echo "Migrating $MYSQL_DATABASE @ $MYSQL_HOST:$MYSQL_PORT as $MYSQL_USER"
 for file in \
   migration-auth-reminder.sql \
   migration-memory-embedding.sql \
-  migration-todo-punch.sql
+  migration-todo-punch.sql \
+  migration-memory-manage.sql
 do
   path="$DB_DIR/$file"
   echo "→ $file"

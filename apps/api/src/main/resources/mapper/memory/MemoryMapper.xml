@@ -9,37 +9,49 @@
     <result property="category" column="category"/>
     <result property="memoryText" column="memory_text"/>
     <result property="strength" column="strength"/>
+    <result property="archived" column="archived"/>
     <result property="embeddingJson" column="embedding_json"/>
     <result property="updatedAt" column="updated_at"/>
   </resultMap>
 
   <select id="findById" resultMap="MemoryEntityMap">
-    SELECT id, user_id, category, memory_text, strength, embedding_json, updated_at
+    SELECT id, user_id, category, memory_text, strength, archived, embedding_json, updated_at
     FROM memories
     WHERE id = #{id}
     LIMIT 1
   </select>
 
   <select id="listByUserId" resultMap="MemoryEntityMap">
-    SELECT id, user_id, category, memory_text, strength, embedding_json, updated_at
+    SELECT id, user_id, category, memory_text, strength, archived, embedding_json, updated_at
     FROM memories
     WHERE user_id = #{userId}
-    ORDER BY strength DESC, updated_at DESC
+    <if test="!includeArchived">
+      AND archived = 0
+    </if>
+    ORDER BY archived ASC, strength DESC, updated_at DESC
   </select>
 
   <insert id="insert">
     INSERT INTO memories (
-      id, user_id, category, memory_text, strength, embedding_json, updated_at
+      id, user_id, category, memory_text, strength, archived, embedding_json, updated_at
     ) VALUES (
-      #{id}, #{userId}, #{category}, #{memoryText}, #{strength}, #{embeddingJson}, #{updatedAt}
+      #{id}, #{userId}, #{category}, #{memoryText}, #{strength}, #{archived}, #{embeddingJson}, #{updatedAt}
     )
   </insert>
 
   <update id="update">
     UPDATE memories
-    SET strength = #{strength},
+    SET category = #{category},
+        memory_text = #{memoryText},
+        strength = #{strength},
+        archived = #{archived},
         embedding_json = #{embeddingJson},
         updated_at = #{updatedAt}
     WHERE id = #{id}
   </update>
+
+  <delete id="deleteById">
+    DELETE FROM memories
+    WHERE id = #{id} AND user_id = #{userId}
+  </delete>
 </mapper>

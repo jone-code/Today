@@ -45,6 +45,7 @@ public final class EntityMapper {
         MemoryCategory.valueOf(entity.getCategory()),
         entity.getMemoryText(),
         entity.getStrength(),
+        entity.isArchived(),
         entity.getUpdatedAt().toString());
   }
 
