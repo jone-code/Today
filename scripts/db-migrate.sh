@@ -21,7 +21,8 @@ for file in \
   migration-todo-punch.sql \
   migration-memory-manage.sql \
   migration-proactive-events.sql \
-  migration-checkin-ai-jobs.sql
+  migration-checkin-ai-jobs.sql \
+  migration-ai-call-logs.sql
 do
   path="$DB_DIR/$file"
   echo "→ $file"

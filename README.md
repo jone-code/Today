@@ -141,4 +141,6 @@ TODAY_AUTH_TOKEN=<jwt> FILL_MISSING=true npm run vector:reindex
 # 全量重建：SCOPE=all RECREATE=true FILL_MISSING=true npm run vector:reindex
 ```
 
-当前状态：**前端已迁入 `apps/web` 并接入 TanStack Query**；Todo / 习惯打卡已落地；默认强制登录走 API；`aigateway` 已接通 OpenAI 兼容 LLM + Embedding 检索；checkin AI 流水线异步；记忆可管理；e2e 冒烟可用；向量检索可外挂 Qdrant 并可 reindex。
+AI 调用可观测见 [`docs/ai-observability.md`](docs/ai-observability.md)（`/health.ai`、`/v1/admin/ai/stats`）。
+
+当前状态：**前端已迁入 `apps/web` 并接入 TanStack Query**；Todo / 习惯打卡已落地；默认强制登录走 API；`aigateway` 已接通 OpenAI 兼容 LLM + Embedding 检索；checkin AI 流水线异步且可重试；记忆可管理；e2e 冒烟可用；向量检索可外挂 Qdrant 并可 reindex；AI 调用可审计。

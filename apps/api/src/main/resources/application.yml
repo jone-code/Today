@@ -31,6 +31,8 @@ today:
     retrieve-top-k: ${OPENAI_RETRIEVE_TOP_K:5}
     async-checkin: ${TODAY_AI_ASYNC_CHECKIN:true}
     job-poll-ms: ${TODAY_AI_JOB_POLL_MS:15000}
+    admin-token: ${TODAY_AI_ADMIN_TOKEN:}
+    log-retain-days: ${TODAY_AI_LOG_RETAIN_DAYS:7}
   vector:
     # mysql = 扫描 embedding_json；qdrant = 外挂向量库（失败回退 mysql）
     provider: ${TODAY_VECTOR_PROVIDER:mysql}

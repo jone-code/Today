@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.today.aigateway.AiCallLogMapper">
+
+  <resultMap id="LogMap" type="com.today.persistence.AiCallLogEntity">
+    <id property="id" column="id"/>
+    <result property="kind" column="kind"/>
+    <result property="task" column="task"/>
+    <result property="provider" column="provider"/>
+    <result property="outcome" column="outcome"/>
+    <result property="elapsedMs" column="elapsed_ms"/>
+    <result property="inputUnits" column="input_units"/>
+    <result property="errorMessage" column="error_message"/>
+    <result property="createdAt" column="created_at"/>
+  </resultMap>
+
+  <insert id="insert">
+    INSERT INTO ai_call_logs (
+      id, kind, task, provider, outcome, elapsed_ms, input_units, error_message, created_at
+    ) VALUES (
+      #{id}, #{kind}, #{task}, #{provider}, #{outcome}, #{elapsedMs}, #{inputUnits},
+      #{errorMessage}, #{createdAt}
+    )
+  </insert>
+
+  <select id="listRecent" resultMap="LogMap">
+    SELECT id, kind, task, provider, outcome, elapsed_ms, input_units, error_message, created_at
+    FROM ai_call_logs
+    ORDER BY created_at DESC
+    LIMIT #{limit}
+  </select>
+
+  <select id="aggregateSince" resultType="map">
+    SELECT
+      kind AS kind,
+      IFNULL(task, '') AS task,
+      outcome AS outcome,
+      COUNT(*) AS cnt,
+      AVG(elapsed_ms) AS avgElapsedMs,
+      MAX(elapsed_ms) AS maxElapsedMs
+    FROM ai_call_logs
+    WHERE created_at &gt;= #{since}
+    GROUP BY kind, task, outcome
+    ORDER BY kind, task, outcome
+  </select>
+
+  <select id="avgElapsedSince" resultType="double">
+    SELECT AVG(elapsed_ms)
+    FROM ai_call_logs
+    WHERE created_at &gt;= #{since}
+      AND outcome = #{outcome}
+  </select>
+
+  <delete id="deleteOlderThan">
+    DELETE FROM ai_call_logs
+    WHERE created_at &lt; #{before}
+  </delete>
+</mapper>

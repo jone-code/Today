@@ -31,6 +31,12 @@ public class AiProperties {
   /** 异步任务调度轮询间隔（毫秒） */
   private long jobPollMs = 15000;
 
+  /** AI 可观测管理口令；非空时 /v1/admin/ai/* 需 X-Today-Admin-Token */
+  private String adminToken = "";
+
+  /** ai_call_logs 保留天数 */
+  private int logRetainDays = 7;
+
   public String getApiKey() {
     return apiKey;
   }
@@ -109,6 +115,26 @@ public class AiProperties {
 
   public void setJobPollMs(long jobPollMs) {
     this.jobPollMs = jobPollMs;
+  }
+
+  public String getAdminToken() {
+    return adminToken;
+  }
+
+  public void setAdminToken(String adminToken) {
+    this.adminToken = adminToken;
+  }
+
+  public int getLogRetainDays() {
+    return logRetainDays;
+  }
+
+  public void setLogRetainDays(int logRetainDays) {
+    this.logRetainDays = logRetainDays;
+  }
+
+  public boolean hasAdminToken() {
+    return adminToken != null && !adminToken.isBlank();
   }
 
   public boolean isConfigured() {

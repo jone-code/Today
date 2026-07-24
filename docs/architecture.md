@@ -204,11 +204,13 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 
 #### `ai-gateway` — AI 基础设施（支撑模块）
 
-- **负责：** Provider 抽象、prompt 模板、embedding、超时/重试/降级、调用日志。
+- **负责：** Provider 抽象、prompt 模板、embedding、超时/重试/降级、调用日志与审计。
 - **不负责：** 任何业务决策（不拥有 checkin/memory 表）。
 - **接口示例：**
   - `complete(task: 'summary' | 'memory_extract' | 'proactive', input)`
   - `embed(texts: string[])`
+  - `GET /v1/admin/ai/stats` · `GET /v1/admin/ai/calls`（可观测；可选 `TODAY_AI_ADMIN_TOKEN`）
+- **数据：** `ai_call_logs`（outcome=ok|fallback|failed|skipped，含耗时）
 
 #### `vector` — 向量索引（支撑模块）
 
@@ -296,6 +298,7 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 14. ✅ 主动关联变真（跨日追问候选、指纹去重、已回答/忽略抑制、选择填脚手架；见 `proactive_prompt_events`）
 15. ✅ 向量库可运维（reindex/backfill、recreate、`/health.vector`；`scripts/vector-reindex.sh`）
 16. ✅ 异步可靠化（`checkin_ai_jobs` 持久化 + 重试退避 + 失败可见 + reprocess）
+17. ✅ 可观测性（`ai_call_logs` + `/health.ai` + `/v1/admin/ai/stats|calls`）
 
 ---
 

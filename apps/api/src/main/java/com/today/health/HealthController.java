@@ -1,5 +1,6 @@
 package com.today.health;
 
+import com.today.aigateway.AiCallObserver;
 import com.today.aigateway.AiGatewayService;
 import com.today.vector.VectorHealth;
 import com.today.vector.VectorReindexService;
@@ -14,12 +15,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class HealthController {
 
   private final AiGatewayService aiGateway;
+  private final AiCallObserver aiCallObserver;
   private final VectorStore vectorStore;
   private final VectorReindexService vectorReindex;
 
   public HealthController(
-      AiGatewayService aiGateway, VectorStore vectorStore, VectorReindexService vectorReindex) {
+      AiGatewayService aiGateway,
+      AiCallObserver aiCallObserver,
+      VectorStore vectorStore,
+      VectorReindexService vectorReindex) {
     this.aiGateway = aiGateway;
+    this.aiCallObserver = aiCallObserver;
     this.vectorStore = vectorStore;
     this.vectorReindex = vectorReindex;
   }
@@ -31,6 +37,7 @@ public class HealthController {
     body.put("service", "today-api");
     body.put("stack", "spring-boot");
     body.put("aiProvider", aiGateway.getActiveProvider().name());
+    body.put("ai", aiCallObserver.processStats());
     body.put("vectorProvider", vectorStore.provider());
     VectorHealth vh = vectorReindex.health();
     body.put("vector", vh.toMap());
