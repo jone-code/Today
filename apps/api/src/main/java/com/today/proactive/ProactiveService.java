@@ -1,5 +1,6 @@
 package com.today.proactive;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.today.aigateway.AiGatewayService;
 import com.today.aigateway.AiGatewayService.AiTask;
 import com.today.checkin.CheckinDto;
@@ -8,14 +9,18 @@ import com.today.common.PromptSource;
 import com.today.memory.MemoryDto;
 import com.today.memory.MemoryService;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 @Service
 public class ProactiveService {
+
+  private static final TypeReference<ProactivePayload> PROACTIVE_TYPE =
+      new TypeReference<>() {};
 
   private final AiGatewayService aiGateway;
   private final CheckinService checkins;
@@ -31,20 +36,61 @@ public class ProactiveService {
   public ProactiveTodayDto today() {
     String date = checkins.todayDate();
     List<CheckinDto> recent = checkins.listRecent(14);
-    List<MemoryDto> memoryList = memories.list();
+    List<CheckinDto> recentForPrompt =
+        recent.size() > 7 ? recent.subList(0, 7) : recent;
+
+    String query = buildRetrievalQuery(date, recent);
+    List<MemoryDto> retrieved = memories.retrieveRelevant(query, aiGateway.retrieveTopK());
+
+    Map<String, Object> input = new HashMap<>();
+    input.put("date", date);
+    input.put("recent", recentForPrompt);
+    input.put("memories", retrieved);
 
     var result =
         aiGateway.complete(
             AiTask.proactive,
-            Map.of("recent", recent, "memories", memoryList),
-            () -> heuristicPrompts(date, recent, memoryList));
+            input,
+            PROACTIVE_TYPE,
+            () -> new ProactivePayload(heuristicPrompts(date, recent, retrieved)));
 
-    List<ProactivePromptDto> prompts = result.data();
-    if (prompts.size() > 3) {
-      prompts = prompts.subList(0, 3);
+    List<ProactivePromptDto> prompts =
+        result.data() == null || result.data().prompts() == null
+            ? List.of()
+            : result.data().prompts().stream()
+                .filter(p -> p != null && p.text() != null && !p.text().isBlank())
+                .map(this::normalizePrompt)
+                .limit(3)
+                .toList();
+
+    if (prompts.isEmpty()) {
+      prompts = heuristicPrompts(date, recent, retrieved);
     }
 
     return new ProactiveTodayDto(date, prompts, result.provider());
+  }
+
+  private String buildRetrievalQuery(String today, List<CheckinDto> recent) {
+    String recentText =
+        recent.stream()
+            .limit(3)
+            .map(c -> c.date() + "：" + c.rawText())
+            .collect(Collectors.joining("\n"));
+    if (recentText.isBlank()) {
+      return "今天是 " + today + "。请根据用户长期记忆，温和地开启今日对话。";
+    }
+    return "今天是 " + today + "。近期记录：\n" + recentText;
+  }
+
+  private ProactivePromptDto normalizePrompt(ProactivePromptDto p) {
+    String id =
+        p.id() == null || p.id().isBlank()
+            ? "prompt-" + Integer.toHexString(p.text().hashCode())
+            : p.id().trim();
+    PromptSource source = p.source() == null ? PromptSource.gentle : p.source();
+    String related =
+        p.relatedDate() == null || p.relatedDate().isBlank() ? null : p.relatedDate().trim();
+    return new ProactivePromptDto(id, p.text().trim(), related, source);
   }
 
   private List<ProactivePromptDto> heuristicPrompts(
@@ -85,7 +131,7 @@ public class ProactiveService {
 
     if (!memoryList.isEmpty()) {
       MemoryDto top = memoryList.get(0);
-      if (top.strength() >= 2 && prompts.size() < 2) {
+      if (prompts.size() < 2) {
         prompts.add(
             new ProactivePromptDto(
                 "memory-" + top.id(),
@@ -103,4 +149,6 @@ public class ProactiveService {
 
     return prompts;
   }
+
+  public record ProactivePayload(List<ProactivePromptDto> prompts) {}
 }

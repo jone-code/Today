@@ -20,3 +20,13 @@ today:
   jwt:
     secret: ${TODAY_JWT_SECRET:today-dev-jwt-secret-change-me-please-32bytes}
     expire-hours: ${TODAY_JWT_EXPIRE_HOURS:168}
+  ai:
+    api-key: ${OPENAI_API_KEY:}
+    base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
+    model: ${OPENAI_MODEL:gpt-4o-mini}
+    embedding-model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+    timeout-ms: ${OPENAI_TIMEOUT_MS:30000}
+    json-response-format: ${OPENAI_JSON_RESPONSE_FORMAT:true}
+    temperature: ${OPENAI_TEMPERATURE:0.3}
+    retrieve-top-k: ${OPENAI_RETRIEVE_TOP_K:5}
+    async-checkin: ${TODAY_AI_ASYNC_CHECKIN:true}

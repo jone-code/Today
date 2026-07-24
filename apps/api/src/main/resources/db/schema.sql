@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS memories (
   category VARCHAR(16) NOT NULL,
   memory_text VARCHAR(512) NOT NULL,
   strength INT NOT NULL DEFAULT 1,
+  embedding_json LONGTEXT NULL,
   updated_at DATETIME(3) NOT NULL,
   PRIMARY KEY (id),
   KEY idx_memories_user_strength (user_id, strength DESC, updated_at DESC)
@@ -82,4 +83,43 @@ CREATE TABLE IF NOT EXISTS reminder_deliveries (
   PRIMARY KEY (id),
   UNIQUE KEY uk_reminder_fire (reminder_id, fire_date),
   KEY idx_deliveries_user_status (user_id, status, created_at DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS todos (
+  id VARCHAR(36) NOT NULL,
+  user_id VARCHAR(64) NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  note VARCHAR(1000) NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'open',
+  due_date DATE NULL,
+  created_at DATETIME(3) NOT NULL,
+  updated_at DATETIME(3) NOT NULL,
+  completed_at DATETIME(3) NULL,
+  PRIMARY KEY (id),
+  KEY idx_todos_user_status (user_id, status, updated_at DESC),
+  KEY idx_todos_user_due (user_id, due_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS punch_habits (
+  id VARCHAR(36) NOT NULL,
+  user_id VARCHAR(64) NOT NULL,
+  title VARCHAR(128) NOT NULL,
+  description VARCHAR(512) NULL,
+  enabled TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME(3) NOT NULL,
+  updated_at DATETIME(3) NOT NULL,
+  PRIMARY KEY (id),
+  KEY idx_punch_habits_user (user_id, enabled, created_at DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS punch_logs (
+  id VARCHAR(36) NOT NULL,
+  habit_id VARCHAR(36) NOT NULL,
+  user_id VARCHAR(64) NOT NULL,
+  punch_date DATE NOT NULL,
+  note VARCHAR(512) NULL,
+  created_at DATETIME(3) NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_punch_habit_date (habit_id, punch_date),
+  KEY idx_punch_logs_user_date (user_id, punch_date DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

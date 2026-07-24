@@ -28,7 +28,7 @@ today/
     └── architecture.md
 ```
 
-当前仓库根目录仍是早期单包 demo，**迁移顺序**：先立契约与 api 骨架 → 再把 `src/` 迁入 `apps/web` → 删掉本地启发式“假 AI”。
+当前仓库：**前端已迁入 `apps/web`（`features/*` + `shared/`）**；后端在 `apps/api`；契约在 `packages/contracts`。
 
 ---
 
@@ -40,9 +40,9 @@ today/
 |----|------|------|
 | 框架 | **Next.js（App Router）+ TypeScript** | 已有基础；SSR/落地页 + App 内交互都合适 |
 | 样式 | **Tailwind CSS** | 迭代快，适合品牌向 UI |
-| 数据请求 | **TanStack Query** | 时间轴/记忆/今日状态缓存与失效清晰 |
+| 数据请求 | **TanStack Query** | 今日态 / 提醒缓存与失效；默认走 API |
 | 表单 | 原生 + 小组件即可 | MVP 只有一个主输入，不必上重型表单库 |
-| 鉴权（二期） | Auth.js / Clerk 择一 | 本期可先用 dev user |
+| 鉴权 | JWT（Bearer）+ 本地 token | 与 `apps/api` identity 对齐 |
 
 **前端模块目录（按能力）：**
 
@@ -51,15 +51,18 @@ apps/web/src/
 ├── app/                      # 路由壳：/ 、/app/*
 ├── features/
 │   ├── checkin/              # 每日记录
-│   ├── summary/              # 展示/触发总结（不直接调模型）
+│   ├── summary/              # 展示日总结（不直接调模型）
 │   ├── timeline/             # 时间轴
 │   ├── memory/               # 长期记忆面板
-│   └── proactive/            # 主动关联提示
-├── shared/                   # UI 基元、日期、http client
-└── styles/
+│   ├── proactive/            # 主动关联提示
+│   ├── identity/             # 登录注册
+│   ├── reminder/             # 定时提醒
+│   ├── todo/                 # 待办
+│   └── punch/                # 习惯打卡
+└── shared/                   # UI 壳、http client、本地 fallback
 ```
 
-前端 **不算** AI 实现层：只消费 API，渲染结果。
+前端 **不算** AI 实现层：只消费 API，渲染结果（无 key 时可用本地 heuristic fallback）。
 
 ### 3.2 后端 `apps/api`
 
@@ -86,6 +89,8 @@ apps/api/src/main/java/com/today/
 ├── aigateway/
 ├── identity/
 ├── reminder/
+├── todo/
+├── punch/
 └── health/
 ```
 
@@ -236,7 +241,7 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
   → 次日 / 当日刷新时 proactive.build
 ```
 
-同步 MVP 可串行；体感慢再改为：checkin 先返回 → 后台任务更新 summary/memory → 前端轮询/推送。
+默认异步：checkin 先返回 `status=processing` → 后台任务更新 summary/memory → 前端轮询 `GET /v1/summaries/:date`。`TODAY_AI_ASYNC_CHECKIN=false` 可同步。
 
 ---
 
@@ -259,7 +264,8 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 
 ## 7. 明确不做（与产品一致，防模块膨胀）
 
-社区、好友、评论、分享、复杂统计、AI 绘图、心理咨询、目标/Todo、打卡排行 —— **不建模块、不建表**。
+社区、好友、评论、分享、复杂统计、AI 绘图、心理咨询、打卡排行榜 —— **不建模块、不建表**。  
+（Todo / 习惯打卡已按产品优先级落地；不做社交化排行。）
 
 ---
 
@@ -268,9 +274,13 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 1. ✅ `packages/contracts` + Spring Boot 模块骨架（checkin/summary/memory/timeline/proactive/aigateway）
 2. ✅ **MyBatis + MySQL**（`db/schema.sql`）
 3. ✅ 用户注册登录（JWT）+ 定时提醒模块
-4. 迁 `apps/web`，features 目录化
-5. 在 `aigateway` 接通 LLM HTTP Client；保留 Heuristic 降级
-6. 补 proactive 检索式关联（不再只靠正则）
+4. ✅ 在 `aigateway` 接通 LLM HTTP Client；保留 Heuristic 降级
+5. ✅ 补 proactive 检索式关联（embedding + 余弦相似度 Top-K；无向量时按 strength 降级）
+6. ✅ 慢路径异步化：checkin 先返回 → 后台更新 summary/memory（可轮询 summary）
+7. ✅ 迁 `apps/web`，features 目录化
+8. ✅ 接入 TanStack Query；默认强制走 API（本地 fallback 需 `NEXT_PUBLIC_ALLOW_LOCAL_FALLBACK=true`）
+9. ✅ Todo / 习惯打卡合入 `apps/api` + `apps/web` features
+10. 向量库外挂（记忆量上来后再考虑）
 
 ---
 

@@ -1,8 +1,8 @@
 package com.today.summary;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.today.aigateway.AiGatewayService;
 import com.today.aigateway.AiGatewayService.AiTask;
-import com.today.common.AiProvider;
 import com.today.common.EntityMapper;
 import com.today.common.JsonUtils;
 import com.today.common.Mood;
@@ -25,6 +25,8 @@ public class SummaryService {
   private static final Pattern SPLIT = Pattern.compile("[。！？!?\\n；;]+");
   private static final List<String> KEYWORD_CANDIDATES =
       List.of("工作", "学习", "家庭", "运动", "创业", "面试");
+  private static final TypeReference<SummaryPayload> SUMMARY_TYPE =
+      new TypeReference<>() {};
 
   private final SummaryMapper summaryMapper;
   private final AiGatewayService aiGateway;
@@ -39,24 +41,33 @@ public class SummaryService {
 
   @Transactional
   public DaySummaryDto generateForCheckin(String checkinId, String date, String rawText) {
+    return generateForCheckin(identity.getCurrentUserId(), checkinId, date, rawText);
+  }
+
+  @Transactional
+  public DaySummaryDto generateForCheckin(
+      String userId, String checkinId, String date, String rawText) {
     var result =
         aiGateway.complete(
-            AiTask.summary, Map.of("rawText", rawText), () -> heuristicSummary(rawText));
+            AiTask.summary,
+            Map.of("rawText", rawText),
+            SUMMARY_TYPE,
+            () -> heuristicSummary(rawText));
 
+    SummaryPayload payload = normalize(result.data());
     Instant now = EntityMapper.now();
     LocalDate summaryDate = EntityMapper.parseDate(date);
-    String userId = identity.getCurrentUserId();
 
     DaySummaryEntity entity = new DaySummaryEntity();
     entity.setCheckinId(checkinId);
     entity.setUserId(userId);
     entity.setSummaryDate(summaryDate);
-    entity.setCompletedJson(JsonUtils.toJson(result.data().completed()));
-    entity.setMood(result.data().mood().name());
-    entity.setMoodLabel(result.data().moodLabel());
-    entity.setKeywordsJson(JsonUtils.toJson(result.data().keywords()));
-    entity.setOneLiner(result.data().oneLiner());
-    entity.setHighlight(result.data().highlight());
+    entity.setCompletedJson(JsonUtils.toJson(payload.completed()));
+    entity.setMood(payload.mood().name());
+    entity.setMoodLabel(payload.moodLabel());
+    entity.setKeywordsJson(JsonUtils.toJson(payload.keywords()));
+    entity.setOneLiner(payload.oneLiner());
+    entity.setHighlight(payload.highlight());
     entity.setProvider(result.provider().name());
     entity.setCreatedAt(now);
 
@@ -74,14 +85,46 @@ public class SummaryService {
     return EntityMapper.toDto(found);
   }
 
+  private SummaryPayload normalize(SummaryPayload raw) {
+    List<String> completed =
+        raw.completed() == null || raw.completed().isEmpty()
+            ? List.of("记录了今天的片刻")
+            : raw.completed().stream().map(String::trim).filter(s -> !s.isEmpty()).limit(3).toList();
+    Mood mood = raw.mood() == null ? Mood.okay : raw.mood();
+    String moodLabel =
+        raw.moodLabel() == null || raw.moodLabel().isBlank()
+            ? defaultMoodLabel(mood)
+            : raw.moodLabel().trim();
+    List<String> keywords =
+        raw.keywords() == null || raw.keywords().isEmpty()
+            ? List.of("日常")
+            : raw.keywords().stream().map(String::trim).filter(s -> !s.isEmpty()).limit(4).toList();
+    String oneLiner =
+        raw.oneLiner() == null || raw.oneLiner().isBlank()
+            ? "今天感觉" + moodLabel + "，已被认真记住。"
+            : raw.oneLiner().trim();
+    String highlight =
+        raw.highlight() == null || raw.highlight().isBlank() ? completed.get(0) : raw.highlight().trim();
+    return new SummaryPayload(completed, mood, moodLabel, keywords, oneLiner, highlight);
+  }
+
+  private static String defaultMoodLabel(Mood mood) {
+    return switch (mood) {
+      case great -> "很好";
+      case good -> "不错";
+      case okay -> "平常";
+      case tired -> "疲惫";
+      case low -> "低落";
+    };
+  }
+
   private SummaryPayload heuristicSummary(String rawText) {
     String text = rawText.trim();
     Mood mood =
         text.matches(".*(累|疲惫|加班).*")
             ? Mood.tired
             : text.matches(".*(开心|顺利|收获).*") ? Mood.great : Mood.okay;
-    String moodLabel =
-        mood == Mood.tired ? "疲惫" : mood == Mood.great ? "很好" : "平常";
+    String moodLabel = defaultMoodLabel(mood);
 
     List<String> keywords = new ArrayList<>();
     for (String k : KEYWORD_CANDIDATES) {
@@ -116,7 +159,8 @@ public class SummaryService {
         highlight);
   }
 
-  private record SummaryPayload(
+  /** LLM / Heuristic 共用的结构化总结载荷 */
+  public record SummaryPayload(
       List<String> completed,
       Mood mood,
       String moodLabel,

@@ -1,20 +1,28 @@
 package com.today.memory;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.today.aigateway.AiGatewayService;
 import com.today.aigateway.AiGatewayService.AiTask;
+import com.today.aigateway.VectorMath;
 import com.today.common.EntityMapper;
+import com.today.common.JsonUtils;
 import com.today.common.MemoryCategory;
 import com.today.identity.IdentityService;
 import com.today.persistence.MemoryEntity;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class MemoryService {
+
+  private static final TypeReference<MemoryExtractPayload> EXTRACT_TYPE =
+      new TypeReference<>() {};
 
   private final MemoryMapper memoryMapper;
   private final AiGatewayService aiGateway;
@@ -33,37 +41,116 @@ public class MemoryService {
         .toList();
   }
 
+  /**
+   * 按 query 检索最相关记忆：有 embedding 走余弦相似度，否则按 strength 降级。
+   */
+  public List<MemoryDto> retrieveRelevant(String queryText, int topK) {
+    String userId = identity.getCurrentUserId();
+    List<MemoryEntity> all = memoryMapper.listByUserId(userId);
+    if (all.isEmpty()) {
+      return List.of();
+    }
+    int limit = Math.max(1, topK);
+
+    Optional<List<float[]>> queryEmbed =
+        aiGateway.embed(List.of(queryText == null ? "" : queryText));
+    if (queryEmbed.isPresent()) {
+      float[] query = queryEmbed.get().get(0);
+      record Scored(MemoryEntity entity, double score) {}
+      List<Scored> scored = new ArrayList<>();
+      for (MemoryEntity entity : all) {
+        float[] vec = JsonUtils.fromJsonFloatArray(entity.getEmbeddingJson());
+        if (vec == null) {
+          continue;
+        }
+        scored.add(new Scored(entity, VectorMath.cosineSimilarity(query, vec)));
+      }
+      if (!scored.isEmpty()) {
+        return scored.stream()
+            .sorted(Comparator.comparingDouble(Scored::score).reversed())
+            .limit(limit)
+            .map(s -> EntityMapper.toDto(s.entity()))
+            .toList();
+      }
+    }
+
+    return all.stream().limit(limit).map(EntityMapper::toDto).toList();
+  }
+
   @Transactional
   public List<MemoryDto> upsertFromCheckin(String rawText) {
+    return upsertFromCheckin(identity.getCurrentUserId(), rawText);
+  }
+
+  @Transactional
+  public List<MemoryDto> upsertFromCheckin(String userId, String rawText) {
     var result =
         aiGateway.complete(
             AiTask.memory_extract,
             Map.of("rawText", rawText),
-            () -> heuristicExtract(rawText));
+            EXTRACT_TYPE,
+            () -> new MemoryExtractPayload(heuristicExtract(rawText)));
 
-    String userId = identity.getCurrentUserId();
     Instant now = EntityMapper.now();
+    List<MemoryCandidate> items =
+        result.data() == null || result.data().items() == null
+            ? List.of()
+            : result.data().items().stream()
+                .filter(i -> i != null && i.text() != null && !i.text().isBlank())
+                .filter(i -> i.category() != null)
+                .limit(5)
+                .toList();
 
-    for (MemoryCandidate item : result.data()) {
-      String id = userId + ":" + item.category().name() + ":" + item.text();
+    List<MemoryEntity> needEmbed = new ArrayList<>();
+
+    for (MemoryCandidate item : items) {
+      String text = item.text().trim();
+      String id = userId + ":" + item.category().name() + ":" + text;
       MemoryEntity existing = memoryMapper.findById(id);
       if (existing == null) {
         MemoryEntity created = new MemoryEntity();
         created.setId(id);
         created.setUserId(userId);
         created.setCategory(item.category().name());
-        created.setMemoryText(item.text());
+        created.setMemoryText(text);
         created.setStrength(1);
         created.setUpdatedAt(now);
         memoryMapper.insert(created);
+        needEmbed.add(created);
       } else {
         existing.setStrength(existing.getStrength() + 1);
         existing.setUpdatedAt(now);
-        memoryMapper.update(existing);
+        if (existing.getEmbeddingJson() == null || existing.getEmbeddingJson().isBlank()) {
+          needEmbed.add(existing);
+        } else {
+          memoryMapper.update(existing);
+        }
       }
     }
 
-    return list();
+    backfillEmbeddings(needEmbed, now);
+    return memoryMapper.listByUserId(userId).stream().map(EntityMapper::toDto).toList();
+  }
+
+  private void backfillEmbeddings(List<MemoryEntity> entities, Instant now) {
+    if (entities.isEmpty()) {
+      return;
+    }
+    List<String> texts = entities.stream().map(MemoryEntity::getMemoryText).toList();
+    Optional<List<float[]>> vectors = aiGateway.embed(texts);
+    if (vectors.isEmpty()) {
+      for (MemoryEntity entity : entities) {
+        memoryMapper.update(entity);
+      }
+      return;
+    }
+    List<float[]> vecs = vectors.get();
+    for (int i = 0; i < entities.size(); i++) {
+      MemoryEntity entity = entities.get(i);
+      entity.setEmbeddingJson(JsonUtils.toJsonFloatArray(vecs.get(i)));
+      entity.setUpdatedAt(now);
+      memoryMapper.update(entity);
+    }
   }
 
   private List<MemoryCandidate> heuristicExtract(String rawText) {
@@ -89,5 +176,7 @@ public class MemoryService {
     return out;
   }
 
-  private record MemoryCandidate(MemoryCategory category, String text) {}
+  public record MemoryExtractPayload(List<MemoryCandidate> items) {}
+
+  public record MemoryCandidate(MemoryCategory category, String text) {}
 }

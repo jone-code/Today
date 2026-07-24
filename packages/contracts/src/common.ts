@@ -23,5 +23,10 @@ export const ApiRoutes = {
   reminderById: "/v1/reminders/:id",
   reminderDeliveries: "/v1/reminders/deliveries",
   reminderDeliveryRead: "/v1/reminders/deliveries/:id/read",
+  todos: "/v1/todos",
+  todoById: "/v1/todos/:id",
+  punchHabits: "/v1/punch/habits",
+  punchHabitById: "/v1/punch/habits/:id",
+  punchToday: "/v1/punch/habits/:id/punch",
   health: "/health",
 } as const;

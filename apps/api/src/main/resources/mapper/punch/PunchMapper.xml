@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.today.punch.PunchMapper">
+
+  <resultMap id="HabitMap" type="com.today.persistence.PunchHabitEntity">
+    <id property="id" column="id"/>
+    <result property="userId" column="user_id"/>
+    <result property="title" column="title"/>
+    <result property="description" column="description"/>
+    <result property="enabled" column="enabled"/>
+    <result property="createdAt" column="created_at"/>
+    <result property="updatedAt" column="updated_at"/>
+  </resultMap>
+
+  <resultMap id="LogMap" type="com.today.persistence.PunchLogEntity">
+    <id property="id" column="id"/>
+    <result property="habitId" column="habit_id"/>
+    <result property="userId" column="user_id"/>
+    <result property="punchDate" column="punch_date"/>
+    <result property="note" column="note"/>
+    <result property="createdAt" column="created_at"/>
+  </resultMap>
+
+  <select id="findHabitById" resultMap="HabitMap">
+    SELECT id, user_id, title, description, enabled, created_at, updated_at
+    FROM punch_habits
+    WHERE id = #{id}
+    LIMIT 1
+  </select>
+
+  <select id="listHabitsByUserId" resultMap="HabitMap">
+    SELECT id, user_id, title, description, enabled, created_at, updated_at
+    FROM punch_habits
+    WHERE user_id = #{userId}
+    ORDER BY enabled DESC, created_at DESC
+  </select>
+
+  <insert id="insertHabit">
+    INSERT INTO punch_habits (
+      id, user_id, title, description, enabled, created_at, updated_at
+    ) VALUES (
+      #{id}, #{userId}, #{title}, #{description}, #{enabled}, #{createdAt}, #{updatedAt}
+    )
+  </insert>
+
+  <update id="updateHabit">
+    UPDATE punch_habits
+    SET title = #{title},
+        description = #{description},
+        enabled = #{enabled},
+        updated_at = #{updatedAt}
+    WHERE id = #{id}
+      AND user_id = #{userId}
+  </update>
+
+  <delete id="deleteHabit">
+    DELETE FROM punch_habits
+    WHERE id = #{id}
+      AND user_id = #{userId}
+  </delete>
+
+  <select id="findLog" resultMap="LogMap">
+    SELECT id, habit_id, user_id, punch_date, note, created_at
+    FROM punch_logs
+    WHERE habit_id = #{habitId}
+      AND punch_date = #{punchDate}
+    LIMIT 1
+  </select>
+
+  <select id="listLogsByHabit" resultMap="LogMap">
+    SELECT id, habit_id, user_id, punch_date, note, created_at
+    FROM punch_logs
+    WHERE habit_id = #{habitId}
+    ORDER BY punch_date DESC
+    LIMIT #{limit}
+  </select>
+
+  <select id="listLogsByUserAndDate" resultMap="LogMap">
+    SELECT id, habit_id, user_id, punch_date, note, created_at
+    FROM punch_logs
+    WHERE user_id = #{userId}
+      AND punch_date = #{punchDate}
+  </select>
+
+  <insert id="insertLog">
+    INSERT INTO punch_logs (
+      id, habit_id, user_id, punch_date, note, created_at
+    ) VALUES (
+      #{id}, #{habitId}, #{userId}, #{punchDate}, #{note}, #{createdAt}
+    )
+  </insert>
+
+  <delete id="deleteLog">
+    DELETE FROM punch_logs
+    WHERE habit_id = #{habitId}
+      AND user_id = #{userId}
+      AND punch_date = #{punchDate}
+  </delete>
+</mapper>

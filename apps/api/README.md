@@ -11,10 +11,29 @@ src/main/java/com/today/
   memory/       长期记忆
   timeline/     时间轴
   proactive/    主动关联
-  aigateway/    模型抽象
-  identity/     用户占位
+  aigateway/    模型抽象（OpenAI 兼容 + Heuristic 降级）
+  identity/     用户认证
+  reminder/     定时提醒
+  todo/         待办
+  punch/        习惯打卡
   persistence/  数据库实体
 ```
+
+## AI Gateway
+
+`summary` / `memory` / `proactive` 均经 `AiGatewayService.complete`：
+
+1. 配置了 `OPENAI_API_KEY` → 调 OpenAI 兼容 Chat Completions，要求结构化 JSON
+2. 无 key、超时、非 JSON、解析失败 → 自动降级现有 Heuristic
+3. `provider` 字段写入 summary / proactive 响应用于观测
+
+记忆写入时会调用 Embedding API，把向量存入 `memories.embedding_json`；`proactive` 先按近期记录检索 Top-K 相关记忆，再交给 LLM 挑选/润色。无 embedding 时按 `strength` 降级。
+
+`POST /v1/checkins` 默认异步：立刻返回 `{ status: "processing", summary: null }`，后台跑 summary → memory；前端轮询 `GET /v1/summaries/:date`。设 `TODAY_AI_ASYNC_CHECKIN=false` 可改回同步。
+
+已有库请执行：`src/main/resources/db/migration-memory-embedding.sql`
+
+本地无 key 即可完整跑通；接真模型只需设置环境变量后重启 API。
 
 MyBatis XML：`src/main/resources/mapper/**/*.xml`
 
@@ -52,7 +71,14 @@ npm run dev:api
 | `MYSQL_PASSWORD` | `today` | 数据库密码 |
 | `TODAY_JWT_SECRET` | 开发默认值（请更换） | JWT 签名密钥，至少 32 字节 |
 | `TODAY_JWT_EXPIRE_HOURS` | `168` | Token 有效小时数 |
-| `OPENAI_API_KEY` | — | 有值时走 LLM（尚未接通） |
+| `OPENAI_API_KEY` | — | 有值时走 LLM；为空则 Heuristic |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI 兼容网关 |
+| `OPENAI_MODEL` | `gpt-4o-mini` | Chat 模型名 |
+| `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding 模型 |
+| `OPENAI_TIMEOUT_MS` | `30000` | 调用超时 |
+| `OPENAI_JSON_RESPONSE_FORMAT` | `true` | 不支持 `response_format` 的网关可设 `false` |
+| `OPENAI_RETRIEVE_TOP_K` | `5` | proactive 记忆检索条数 |
+| `TODAY_AI_ASYNC_CHECKIN` | `true` | checkin 后异步跑 AI；`false` 同步 |
 
 ## 认证
 
@@ -71,6 +97,15 @@ npm run dev:api
 
 调度器每分钟扫描一次到期提醒，写入 `reminder_deliveries`。
 
-若数据库已初始化，请执行 `src/main/resources/db/migration-auth-reminder.sql`。
+## Todo / 习惯打卡
+
+- Todos：`GET/POST /v1/todos`，`PUT/DELETE /v1/todos/{id}`，`POST /v1/todos/{id}/toggle`
+- Punch：`GET/POST /v1/punch/habits`，`PUT/DELETE /v1/punch/habits/{id}`，`POST/DELETE /v1/punch/habits/{id}/punch`
+
+已有库迁移（按需执行）：
+
+- `src/main/resources/db/migration-auth-reminder.sql`
+- `src/main/resources/db/migration-memory-embedding.sql`
+- `src/main/resources/db/migration-todo-punch.sql`
 
 表结构完整版见 `src/main/resources/db/schema.sql`。
