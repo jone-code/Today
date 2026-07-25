@@ -46,7 +46,16 @@ docker compose ps
 查看日志：`npm run stack:logs`  
 停止：`npm run stack:down`
 
-首次 MySQL 会加载 `apps/api/src/main/resources/db/schema.sql`。旧库增量仍用 `npm run db:migrate`。
+首次 MySQL（空数据卷）会自动加载 `apps/api/src/main/resources/db/schema.sql`。  
+若卷已存在但表为空/缺失，手动初始化：
+
+```bash
+npm run db:init:docker          # 推荐：经 today-mysql 容器执行
+# 或本机有 mysql 客户端：
+# MYSQL_USER=root MYSQL_PASSWORD=root npm run db:init
+```
+
+旧库增量迁移：`npm run db:migrate`。
 
 ### 常用环境变量
 
