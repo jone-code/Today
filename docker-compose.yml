@@ -20,7 +20,7 @@ services:
       retries: 20
 
   qdrant:
-    image: qdrant/qdrant:v1.13.4
+    image: qdrant/qdrant:v1.18.3
     container_name: today-qdrant
     restart: unless-stopped
     ports:
