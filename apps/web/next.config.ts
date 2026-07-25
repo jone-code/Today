@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Required for apps/web/Dockerfile (standalone server.js output).
+  output: "standalone",
 };
 
 export default nextConfig;

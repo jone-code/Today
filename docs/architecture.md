@@ -120,9 +120,10 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 | 项 | 选型 |
 |----|------|
 | 包管理 | npm workspaces（或 pnpm） |
-| 本地 DB | Docker Compose：MySQL 8 |
-| 配置 | `.env` + 各 app 的 schema 校验 |
-| 测试 | Vitest（domain/api），前端关键 Testing Library 后补 |
+| 本地 / 发布态 | Docker Compose：MySQL 8 + Qdrant + API + Web（`npm run stack:up`） |
+| 配置 | `.env.example` → `.env`；见 `docs/deploy.md` |
+| CI | GitHub Actions：`mvn test` + web lint/build + Docker build |
+| 测试 | API JUnit（Maven）；e2e 冒烟 `npm run e2e:smoke`；前端单测后补 |
 
 ---
 
@@ -299,6 +300,7 @@ AI 编排可在 Java `aigateway` 模块内接 OpenAI 兼容 HTTP SDK；若以后
 15. ✅ 向量库可运维（reindex/backfill、recreate、`/health.vector`；`scripts/vector-reindex.sh`）
 16. ✅ 异步可靠化（`checkin_ai_jobs` 持久化 + 重试退避 + 失败可见 + reprocess）
 17. ✅ 可观测性（`ai_call_logs` + `/health.ai` + `/v1/admin/ai/stats|calls`）
+18. ✅ 发布就绪（Compose 一键全栈 + GitHub Actions CI；见 `docs/deploy.md`）
 
 ---
 
