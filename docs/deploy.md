@@ -11,6 +11,13 @@ cp .env.example .env   # 可选；按需改密钥与 OPENAI_API_KEY
 npm run stack:up       # 等价 docker compose up -d --build
 ```
 
+### 国内拉镜像失败
+
+1. **不要用失效的阿里云个人加速器**：`*.mirror.aliyuncs.com` 常返回 `403 Forbidden`。  
+   建议 `daemon.json` 改用 DaoCloud：`"registry-mirrors": ["https://docker.m.daocloud.io"]`，然后重启 Docker。
+2. **或直接用带前缀的镜像名**（`.env.example` 已写好）：`MYSQL_IMAGE` / `QDRANT_IMAGE` / `JAVA_*` / `NODE_IMAGE`。
+3. Dockerfile **已去掉** `# syntax=docker/dockerfile:1`，避免 BuildKit 再去拉 `docker/dockerfile` frontend。
+
 | 服务 | 地址 |
 |------|------|
 | Web | http://localhost:3000 |
