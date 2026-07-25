@@ -34,10 +34,15 @@ VectorReindexService → 存量 backfill / reindex / recreate
 ## 本地启用 Qdrant
 
 ```bash
+# 国内拉取困难：先配 .env 里的 QDRANT_IMAGE（见 .env.example），或：
+# docker pull docker.m.daocloud.io/qdrant/qdrant:v1.18.3
+# docker tag docker.m.daocloud.io/qdrant/qdrant:v1.18.3 qdrant/qdrant:v1.18.3
 docker compose up -d qdrant   # 或 npm run vector:up
 export TODAY_VECTOR_PROVIDER=qdrant
 npm run dev:api
 ```
+
+国内镜像源（DaoCloud）：`docker.m.daocloud.io/qdrant/qdrant:v1.18.3`。也可在 Docker `daemon.json` 配全局加速：`https://docker.m.daocloud.io`。
 
 `GET /health` 返回：
 

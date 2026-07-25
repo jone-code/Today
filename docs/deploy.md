@@ -16,7 +16,7 @@ npm run stack:up       # 等价 docker compose up -d --build
 | Web | http://localhost:3000 |
 | API | http://localhost:3001/health |
 | MySQL | localhost:3306（库 `today`） |
-| Qdrant | http://localhost:6333 |
+| Qdrant | http://localhost:6333（镜像可用 `QDRANT_IMAGE=docker.m.daocloud.io/qdrant/qdrant:v1.18.3`） |
 
 查看日志：`npm run stack:logs`  
 停止：`npm run stack:down`
