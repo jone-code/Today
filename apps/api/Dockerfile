@@ -1,12 +1,13 @@
-# syntax=docker/dockerfile:1
+ARG JAVA_BUILD_IMAGE=maven:3.9.9-eclipse-temurin-17
+ARG JAVA_RUNTIME_IMAGE=eclipse-temurin:17-jre-jammy
 
-FROM maven:3.9.9-eclipse-temurin-17 AS build
+FROM ${JAVA_BUILD_IMAGE} AS build
 WORKDIR /build
 COPY apps/api/pom.xml .
 COPY apps/api/src ./src
 RUN mvn -q -DskipTests package
 
-FROM eclipse-temurin:17-jre-jammy
+FROM ${JAVA_RUNTIME_IMAGE}
 WORKDIR /app
 ENV JAVA_OPTS=""
 ENV PORT=3001
