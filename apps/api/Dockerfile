@@ -11,7 +11,13 @@ FROM ${JAVA_RUNTIME_IMAGE}
 WORKDIR /app
 ENV JAVA_OPTS=""
 ENV PORT=3001
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends curl bash \
+  && rm -rf /var/lib/apt/lists/*
 COPY --from=build /build/target/today-api-0.1.0.jar /app/app.jar
-EXPOSE 3001
+COPY apps/api/docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod 755 /app/docker-entrypoint.sh \
+  && chown -R nobody:nogroup /app
 USER nobody
-ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/app.jar"]
+EXPOSE 3001
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

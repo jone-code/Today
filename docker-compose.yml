@@ -14,10 +14,20 @@ services:
       - today-mysql-data:/var/lib/mysql
       - ./apps/api/src/main/resources/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      test:
+        [
+          "CMD",
+          "mysql",
+          "-h127.0.0.1",
+          "-u${MYSQL_USER:-today}",
+          "-p${MYSQL_PASSWORD:-today}",
+          "-e",
+          "SELECT 1",
+        ]
       interval: 5s
       timeout: 5s
-      retries: 20
+      retries: 30
+      start_period: 20s
 
   qdrant:
     # 国内拉取 Docker Hub 困难时，在 .env 设置：
@@ -50,10 +60,12 @@ services:
       mysql:
         condition: service_healthy
       qdrant:
-        condition: service_healthy
+        condition: service_started
     environment:
       PORT: 3001
-      MYSQL_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-today}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8
+      MYSQL_HOST: mysql
+      MYSQL_TCP_PORT: "3306"
+      MYSQL_URL: "jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-today}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8"
       MYSQL_USER: ${MYSQL_USER:-today}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-today}
       TODAY_JWT_SECRET: ${TODAY_JWT_SECRET:-today-dev-jwt-secret-change-me-please-32bytes}
@@ -70,11 +82,11 @@ services:
     ports:
       - "${API_PORT:-3001}:3001"
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/3001'"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3001/health"]
       interval: 10s
       timeout: 5s
-      retries: 12
-      start_period: 40s
+      retries: 18
+      start_period: 90s
 
   web:
     build:
@@ -95,11 +107,17 @@ services:
     ports:
       - "${WEB_PORT:-3000}:3000"
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/3000'"]
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
       interval: 10s
       timeout: 5s
       retries: 12
-      start_period: 20s
+      start_period: 30s
 
 volumes:
   today-mysql-data:
