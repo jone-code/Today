@@ -39,8 +39,15 @@ public class HealthController {
     body.put("aiProvider", aiGateway.getActiveProvider().name());
     body.put("ai", aiCallObserver.processStats());
     body.put("vectorProvider", vectorStore.provider());
-    VectorHealth vh = vectorReindex.health();
-    body.put("vector", vh.toMap());
+    try {
+      VectorHealth vh = vectorReindex.health();
+      body.put("vector", vh.toMap());
+    } catch (Exception e) {
+      Map<String, Object> vector = new LinkedHashMap<>();
+      vector.put("ok", false);
+      vector.put("detail", e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
+      body.put("vector", vector);
+    }
     body.put(
         "modules",
         List.of(
