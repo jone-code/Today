@@ -124,6 +124,9 @@ npm install
 npm run db:up
 # 可选：Qdrant 向量库
 npm run vector:up
+# 初始化表结构（空库 / 表缺失时；幂等）
+npm run db:init:docker
+# 本机有 mysql 客户端时也可用：npm run db:init
 # 旧库增量迁移（幂等）
 npm run db:migrate
 
