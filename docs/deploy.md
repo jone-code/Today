@@ -76,7 +76,7 @@ docker exec today-mysql mysql -uroot -proot -e "USE today; SHOW TABLES LIKE 'che
 见仓库根目录 [`.env.example`](../.env.example)。
 
 - `NEXT_PUBLIC_API_BASE_URL`：浏览器侧 API 前缀（默认 `/api`）。
-- `API_PROXY_TARGET`：Web → API（默认 `http://today-api:3001`）。若代理 502 `fetch failed`：先确认 `docker compose ps` 里 api 为 healthy，并重建 web（已默认 IPv4 DNS）。
+- `API_PROXY_TARGET`：Web → API（默认 `http://today-api:3001`）。若代理 502 / `ECONNREFUSED :3001`：曾因 entrypoint 误把 `PORT` 写成 MySQL `3306` 导致 API 听错端口，已修复；请 `docker compose up -d --build api`。
 - `TODAY_JWT_SECRET`：共享/生产环境务必更换。
 - `OPENAI_API_KEY`：有则走真实 LLM；无则 Heuristic 降级，本地可跑通主链路。
 - `TODAY_VECTOR_PROVIDER=qdrant`：API 容器内已指向 `http://qdrant:6333`。
