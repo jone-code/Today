@@ -44,7 +44,8 @@ jobs:
         run: npm run lint
       - name: Build
         env:
-          NEXT_PUBLIC_API_BASE_URL: http://localhost:3001
+          NEXT_PUBLIC_API_BASE_URL: /api
+          API_PROXY_TARGET: http://127.0.0.1:3001
         run: npm run build
 
   docker:
@@ -71,6 +72,7 @@ jobs:
           push: false
           tags: today-web:ci
           build-args: |
-            NEXT_PUBLIC_API_BASE_URL=http://localhost:3001
+            NEXT_PUBLIC_API_BASE_URL=/api
+            API_PROXY_TARGET=http://api:3001
           cache-from: type=gha
           cache-to: type=gha,mode=max

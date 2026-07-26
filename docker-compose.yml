@@ -94,7 +94,8 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         NODE_IMAGE: ${NODE_IMAGE:-node:22-bookworm-slim}
-        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3001}
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/api}
+        API_PROXY_TARGET: ${API_PROXY_TARGET:-http://api:3001}
     image: today-web:local
     container_name: today-web
     restart: unless-stopped

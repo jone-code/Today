@@ -42,6 +42,8 @@ public class SecurityConfig {
             auth ->
                 auth.requestMatchers("/health", "/health/**", "/healthz")
                     .permitAll()
+                    .requestMatchers(HttpMethod.OPTIONS, "/**")
+                    .permitAll()
                     .requestMatchers(HttpMethod.POST, "/v1/auth/register", "/v1/auth/login")
                     .permitAll()
                     .anyRequest()
