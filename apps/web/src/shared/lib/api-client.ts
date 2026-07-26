@@ -41,7 +41,11 @@ async function requestJson<T>(
       "content-type": "application/json",
       ...(fetchInit.headers as Record<string, string> | undefined),
     };
-    if (token) headers.authorization = `Bearer ${token}`;
+    if (token) {
+      // Dual headers: some Next.js proxies drop Authorization when forwarding.
+      headers.authorization = `Bearer ${token}`;
+      headers["x-today-authorization"] = `Bearer ${token}`;
+    }
 
     const res = await fetch(`${getApiBaseUrl()}${path}`, {
       ...fetchInit,
