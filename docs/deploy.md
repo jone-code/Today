@@ -47,15 +47,16 @@ docker compose ps
 停止：`npm run stack:down`
 
 首次 MySQL（空数据卷）会自动加载 `apps/api/src/main/resources/db/schema.sql`。  
-若卷已存在但表为空/缺失，手动初始化：
+若卷已存在但表为空/缺失，或报 `Table 'today.checkin_ai_jobs' doesn't exist`：
 
 ```bash
-npm run db:init:docker          # 推荐：经 today-mysql 容器执行
-# 或本机有 mysql 客户端：
-# MYSQL_USER=root MYSQL_PASSWORD=root npm run db:init
+npm run db:init:docker          # 对 today-mysql 容器执行 schema+迁移并校验必填表
+docker compose restart api
+# 确认：
+docker exec today-mysql mysql -uroot -proot -e "USE today; SHOW TABLES LIKE 'checkin%';"
 ```
 
-旧库增量迁移：`npm run db:migrate`。
+注意：不要用本机另一个 MySQL（`:3306`）初始化，而 API 连的是 Compose 容器；`db:init` 在检测到 `today-mysql` 时会自动走 `--docker`。
 
 ### 常用环境变量
 
