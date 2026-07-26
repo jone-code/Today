@@ -18,23 +18,31 @@ npm run stack:up       # 等价 docker compose up -d --build
 2. **或直接用带前缀的镜像名**（`.env.example` 已写好）：`MYSQL_IMAGE` / `QDRANT_IMAGE` / `JAVA_*` / `NODE_IMAGE`。
 3. Dockerfile **已去掉** `# syntax=docker/dockerfile:1`，避免 BuildKit 再去拉 `docker/dockerfile` frontend。
 
-### `today-api` 起不来 / dependency api failed
+### `today-api` 起不来 / unhealthy
 
 先看日志：
 
 ```bash
 docker compose logs api --tail=200
 docker compose ps
+curl -s http://127.0.0.1:3001/health/live
 ```
 
-常见原因：
+API 启动时会自动执行 classpath 里的 `schema.sql` + migrations（`today.schema.bootstrap=true`），补齐如 `checkin_ai_jobs` 等表。
+
+仍失败时：
+
+```bash
+npm run db:init:docker
+docker compose up -d --build api
+```
 
 | 现象 | 处理 |
 |------|------|
-| MySQL Access denied / 连不上 | `.env` 密码与旧数据卷不一致时，删卷重建：`docker compose down -v` 后 `npm run stack:up`（会清空本地 DB） |
-| 旧库缺表 | `npm run db:migrate`（连到映射的 3306）或删卷用 `schema.sql` 重来 |
-| 健康检查超时 | 已放宽；确保重建 API 镜像：`docker compose up -d --build api` |
-| 端口占用 | 改 `.env` 里 `API_PORT` / 停掉本机占用 3001 的进程 |
+| MySQL Access denied / 连不上 | `.env` 密码与旧数据卷不一致：`docker compose down -v` 后 `npm run stack:up`（清空本地 DB） |
+| schema bootstrap 报 missing tables | `MYSQL_USER` 需有 DDL 权限；或用 root 跑 `db:init:docker` |
+| 健康检查超时 | 健康检查走 `/health/live`；重建镜像：`docker compose up -d --build api` |
+| 端口占用 | 改 `API_PORT` / 停掉占用 3001 的进程 |
 
 | 服务 | 地址 |
 |------|------|
