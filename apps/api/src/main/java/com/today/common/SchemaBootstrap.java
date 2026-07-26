@@ -80,14 +80,19 @@ public class SchemaBootstrap {
       }
       populator.addScript(resource);
     }
-    DatabasePopulatorUtils.execute(populator, dataSource);
+    try {
+      DatabasePopulatorUtils.execute(populator, dataSource);
+    } catch (Exception e) {
+      log.warn("schema bootstrap script errors (continuing): {}", e.getMessage());
+    }
 
     List<String> missing = missingTables();
     if (!missing.isEmpty()) {
-      throw new IllegalStateException(
-          "Database schema incomplete, missing tables: "
-              + missing
-              + ". Run: npm run db:init:docker  (or grant DDL to MYSQL_USER)");
+      // Do not abort startup — keep /health/live listening for Compose probes.
+      log.error(
+          "schema incomplete, missing tables: {} — run: npm run db:init:docker",
+          missing);
+      return;
     }
     log.info("schema bootstrap: required tables present");
   }
@@ -108,7 +113,8 @@ public class SchemaBootstrap {
         }
       }
     } catch (Exception e) {
-      throw new IllegalStateException("schema bootstrap verification failed: " + e.getMessage(), e);
+      log.error("schema bootstrap verification failed: {}", e.getMessage());
+      return List.of("(verification-failed)");
     }
     return missing;
   }
