@@ -64,7 +64,9 @@ ensure_web() {
   echo "→ starting Web on :$WEB_PORT"
   "${TMUX[@]}" has-session -t "=e2e-web" 2>/dev/null || \
     "${TMUX[@]}" new-session -d -s e2e-web -c "$ROOT" -- \
-      env PORT="$WEB_PORT" NEXT_PUBLIC_API_BASE_URL="$API_BASE_URL" \
+      env PORT="$WEB_PORT" \
+        NEXT_PUBLIC_API_BASE_URL=/api \
+        API_PROXY_TARGET="$API_BASE_URL" \
       npm run dev -w @today/web -- --port "$WEB_PORT" --hostname 127.0.0.1
   STARTED_WEB=1
   wait_http "$WEB_BASE_URL" "Web" 90
