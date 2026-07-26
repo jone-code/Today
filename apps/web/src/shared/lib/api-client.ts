@@ -5,7 +5,7 @@ type ApiError = {
   message?: string;
 };
 
-// Same-origin default: Next.js rewrites /api/* → API (see next.config.ts).
+// Same-origin default: /api/* → apps/web Route Handler proxy → API_PROXY_TARGET.
 // Avoids browser → :3001 cross-origin resets when using Compose / LAN IP.
 const DEFAULT_API_BASE_URL = "/api";
 const TOKEN_KEY = "today.auth.token.v1";

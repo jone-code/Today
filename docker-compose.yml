@@ -105,6 +105,9 @@ services:
     environment:
       PORT: 3000
       HOSTNAME: 0.0.0.0
+      # Runtime proxy target for app/api/[...path] (must be Compose DNS name).
+      API_PROXY_TARGET: ${API_PROXY_TARGET:-http://api:3001}
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/api}
     ports:
       - "${WEB_PORT:-3000}:3000"
     healthcheck:

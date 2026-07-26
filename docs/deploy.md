@@ -70,8 +70,8 @@ docker exec today-mysql mysql -uroot -proot -e "USE today; SHOW TABLES LIKE 'che
 
 见仓库根目录 [`.env.example`](../.env.example)。
 
-- `NEXT_PUBLIC_API_BASE_URL`：浏览器侧 API 前缀（默认 `/api`，同源代理，避免直连 `:3001` 被重置）。
-- `API_PROXY_TARGET`：Web 容器内转发目标（默认 `http://api:3001`）。改后需重建 web：`docker compose up -d --build web`。
+- `NEXT_PUBLIC_API_BASE_URL`：浏览器侧 API 前缀（默认 `/api`）。
+- `API_PROXY_TARGET`：Web 容器运行时转发目标（默认 `http://api:3001`，由 `app/api/[...path]` 代理）。改后 `docker compose up -d --build web`。
 - `TODAY_JWT_SECRET`：共享/生产环境务必更换。
 - `OPENAI_API_KEY`：有则走真实 LLM；无则 Heuristic 降级，本地可跑通主链路。
 - `TODAY_VECTOR_PROVIDER=qdrant`：API 容器内已指向 `http://qdrant:6333`。

@@ -13,7 +13,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package.json package-lock.json ./
 COPY apps/web ./apps/web
 COPY packages/contracts ./packages/contracts
-# Browser calls same-origin /api; Next rewrites to API_PROXY_TARGET at build time.
+# Browser calls same-origin /api; proxy target is also set at runtime in compose.
 ARG NEXT_PUBLIC_API_BASE_URL=/api
 ARG API_PROXY_TARGET=http://api:3001
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
@@ -27,6 +27,8 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+ENV API_PROXY_TARGET=http://api:3001
+ENV NEXT_PUBLIC_API_BASE_URL=/api
 RUN groupadd --system --gid 1001 nodejs \
   && useradd --system --uid 1001 --gid nodejs nextjs
 COPY --from=builder /app/apps/web/public ./apps/web/public
