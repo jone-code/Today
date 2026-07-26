@@ -4,8 +4,11 @@ ARG JAVA_RUNTIME_IMAGE=eclipse-temurin:17-jre-jammy
 FROM ${JAVA_BUILD_IMAGE} AS build
 WORKDIR /build
 COPY apps/api/pom.xml .
+COPY apps/api/docker/maven-settings.xml /root/.m2/settings.xml
 COPY apps/api/src ./src
-RUN mvn -q -DskipTests package
+# -B: batch logs (no -q so dependency/network errors are visible)
+# Aliyun mirror via maven-settings.xml for mainland China pulls.
+RUN mvn -B -DskipTests package
 
 FROM ${JAVA_RUNTIME_IMAGE}
 WORKDIR /app

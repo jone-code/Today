@@ -17,6 +17,11 @@ npm run stack:up       # 等价 docker compose up -d --build
    建议 `daemon.json` 改用 DaoCloud：`"registry-mirrors": ["https://docker.m.daocloud.io"]`，然后重启 Docker。
 2. **或直接用带前缀的镜像名**（`.env.example` 已写好）：`MYSQL_IMAGE` / `QDRANT_IMAGE` / `JAVA_*` / `NODE_IMAGE`。
 3. Dockerfile **已去掉** `# syntax=docker/dockerfile:1`，避免 BuildKit 再去拉 `docker/dockerfile` frontend。
+4. **API 镜像 `mvn package` 失败**：Docker 构建使用 `apps/api/docker/maven-settings.xml`（阿里云 Maven 公共源）。重试：
+   ```bash
+   docker compose build --no-cache api
+   ```
+   若仍失败，把完整 `mvn` 日志末尾贴出（已去掉 `-q`）。
 
 ### `today-api` 起不来 / unhealthy
 
