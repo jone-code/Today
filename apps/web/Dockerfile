@@ -13,8 +13,11 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package.json package-lock.json ./
 COPY apps/web ./apps/web
 COPY packages/contracts ./packages/contracts
-ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:3001
+# Browser calls same-origin /api; Next rewrites to API_PROXY_TARGET at build time.
+ARG NEXT_PUBLIC_API_BASE_URL=/api
+ARG API_PROXY_TARGET=http://api:3001
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
+ENV API_PROXY_TARGET=$API_PROXY_TARGET
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build -w @today/web
 

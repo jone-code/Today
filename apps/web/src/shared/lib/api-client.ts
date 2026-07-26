@@ -5,12 +5,15 @@ type ApiError = {
   message?: string;
 };
 
-const DEFAULT_API_BASE_URL = "http://localhost:3001";
+// Same-origin default: Next.js rewrites /api/* → API (see next.config.ts).
+// Avoids browser → :3001 cross-origin resets when using Compose / LAN IP.
+const DEFAULT_API_BASE_URL = "/api";
 const TOKEN_KEY = "today.auth.token.v1";
 
 export function getApiBaseUrl() {
   const v = process.env.NEXT_PUBLIC_API_BASE_URL;
-  return v && v.length > 0 ? v : DEFAULT_API_BASE_URL;
+  if (v === undefined || v === null || v.trim() === "") return DEFAULT_API_BASE_URL;
+  return v.replace(/\/$/, "");
 }
 
 export function getAuthToken(): string | null {

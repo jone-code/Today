@@ -35,7 +35,7 @@ npm run dev:web
 npm run dev -w @today/web
 ```
 
-默认 `http://localhost:3000`，API 默认 `http://localhost:3001`（`NEXT_PUBLIC_API_BASE_URL` 可覆盖）。
+默认 `http://localhost:3000`。浏览器默认请求同源 `/api/*`（`next.config.ts` 代理到 `API_PROXY_TARGET`，默认 `http://127.0.0.1:3001`）。
 
 ## 规则
 
