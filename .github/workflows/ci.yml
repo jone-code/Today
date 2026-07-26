@@ -73,6 +73,6 @@ jobs:
           tags: today-web:ci
           build-args: |
             NEXT_PUBLIC_API_BASE_URL=/api
-            API_PROXY_TARGET=http://api:3001
+            API_PROXY_TARGET=http://today-api:3001
           cache-from: type=gha
           cache-to: type=gha,mode=max
