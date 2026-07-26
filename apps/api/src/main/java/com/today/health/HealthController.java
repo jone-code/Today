@@ -30,6 +30,15 @@ public class HealthController {
     this.vectorReindex = vectorReindex;
   }
 
+  /** Liveness for Docker healthcheck — no DB / vector calls. */
+  @GetMapping({"/health/live", "/healthz"})
+  public Map<String, Object> live() {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("ok", true);
+    body.put("service", "today-api");
+    return body;
+  }
+
   @GetMapping("/health")
   public Map<String, Object> health() {
     Map<String, Object> body = new LinkedHashMap<>();

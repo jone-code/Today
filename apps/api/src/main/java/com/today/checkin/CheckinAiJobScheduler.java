@@ -19,9 +19,13 @@ public class CheckinAiJobScheduler {
 
   @Scheduled(fixedDelayString = "${today.ai.job-poll-ms:15000}")
   public void tick() {
-    int ran = aiJobs.processDue(8);
-    if (ran > 0) {
-      log.info("processed {} checkin ai jobs", ran);
+    try {
+      int ran = aiJobs.processDue(8);
+      if (ran > 0) {
+        log.info("processed {} checkin ai jobs", ran);
+      }
+    } catch (Exception e) {
+      log.warn("checkin ai job tick failed: {}", e.getMessage());
     }
   }
 }

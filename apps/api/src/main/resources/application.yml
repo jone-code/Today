@@ -22,6 +22,9 @@ mybatis:
     map-underscore-to-camel-case: true
 
 today:
+  schema:
+    # Apply classpath db/schema.sql + migrations on boot when tables are missing.
+    bootstrap: ${TODAY_SCHEMA_BOOTSTRAP:true}
   jwt:
     secret: ${TODAY_JWT_SECRET:today-dev-jwt-secret-change-me-please-32bytes}
     expire-hours: ${TODAY_JWT_EXPIRE_HOURS:168}

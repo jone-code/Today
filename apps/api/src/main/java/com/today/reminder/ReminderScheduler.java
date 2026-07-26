@@ -20,9 +20,13 @@ public class ReminderScheduler {
   /** 每分钟扫描一次到期提醒 */
   @Scheduled(cron = "0 * * * * *")
   public void tick() {
-    int created = reminderService.fireDueReminders(Instant.now());
-    if (created > 0) {
-      log.info("fired {} reminder deliveries", created);
+    try {
+      int created = reminderService.fireDueReminders(Instant.now());
+      if (created > 0) {
+        log.info("fired {} reminder deliveries", created);
+      }
+    } catch (Exception e) {
+      log.warn("reminder tick failed: {}", e.getMessage());
     }
   }
 }
