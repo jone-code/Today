@@ -63,6 +63,7 @@ services:
         condition: service_started
     environment:
       PORT: 3001
+      SERVER_ADDRESS: 0.0.0.0
       MYSQL_HOST: mysql
       MYSQL_TCP_PORT: "3306"
       MYSQL_URL: "jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-today}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8"
@@ -95,18 +96,20 @@ services:
       args:
         NODE_IMAGE: ${NODE_IMAGE:-node:22-bookworm-slim}
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/api}
-        API_PROXY_TARGET: ${API_PROXY_TARGET:-http://api:3001}
+        API_PROXY_TARGET: ${API_PROXY_TARGET:-http://today-api:3001}
     image: today-web:local
     container_name: today-web
     restart: unless-stopped
     depends_on:
       api:
-        condition: service_started
+        condition: service_healthy
     environment:
       PORT: 3000
       HOSTNAME: 0.0.0.0
-      # Runtime proxy target for app/api/[...path] (must be Compose DNS name).
-      API_PROXY_TARGET: ${API_PROXY_TARGET:-http://api:3001}
+      # Prefer IPv4 for Compose DNS (avoids Node fetch failed on AAAA).
+      NODE_OPTIONS: --dns-result-order=ipv4first
+      # Runtime proxy target — use container_name (today-api) on the Compose network.
+      API_PROXY_TARGET: ${API_PROXY_TARGET:-http://today-api:3001}
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/api}
     ports:
       - "${WEB_PORT:-3000}:3000"

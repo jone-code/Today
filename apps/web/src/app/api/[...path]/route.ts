@@ -1,11 +1,25 @@
+import { setDefaultResultOrder } from "node:dns";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+// Docker Compose DNS often returns IPv6 first; Node fetch then fails with "fetch failed".
+setDefaultResultOrder("ipv4first");
+
 function apiTarget(): string {
   const raw = process.env.API_PROXY_TARGET || "http://127.0.0.1:3001";
   return raw.replace(/\/$/, "");
+}
+
+function errorDetail(err: unknown): string {
+  if (!(err instanceof Error)) return String(err);
+  const cause = (err as Error & { cause?: unknown }).cause;
+  if (cause instanceof Error) return `${err.message} (${cause.message})`;
+  if (cause && typeof cause === "object" && "code" in cause) {
+    return `${err.message} (${String((cause as { code: unknown }).code)})`;
+  }
+  return err.message;
 }
 
 async function proxy(
@@ -44,11 +58,10 @@ async function proxy(
     if (upstreamType) out.headers.set("content-type", upstreamType);
     return out;
   } catch (e) {
-    const message = e instanceof Error ? e.message : "proxy failed";
     return NextResponse.json(
       {
         statusCode: 502,
-        message: `API proxy error (${apiTarget()}): ${message}`,
+        message: `API proxy error (${apiTarget()}): ${errorDetail(e)}. Is today-api up? Try: docker compose ps && docker compose logs api --tail=50`,
       },
       { status: 502 },
     );
