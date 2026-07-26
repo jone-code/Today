@@ -1,11 +1,26 @@
 import { setDefaultResultOrder } from "node:dns";
+import http from "node:http";
+import https from "node:https";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// Docker Compose DNS often returns IPv6 first; Node fetch then fails with "fetch failed".
+// Docker Compose DNS often returns IPv6 first; Node then fails with "fetch failed".
 setDefaultResultOrder("ipv4first");
+
+const HOP_BY_HOP = new Set([
+  "connection",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailers",
+  "transfer-encoding",
+  "upgrade",
+  "host",
+  "content-length",
+]);
 
 function apiTarget(): string {
   const raw = process.env.API_PROXY_TARGET || "http://127.0.0.1:3001";
@@ -22,6 +37,68 @@ function errorDetail(err: unknown): string {
   return err.message;
 }
 
+/** Build upstream headers; keep Authorization (Next.js patched fetch may drop it). */
+function upstreamHeaders(req: NextRequest): http.OutgoingHttpHeaders {
+  const out: http.OutgoingHttpHeaders = {};
+  req.headers.forEach((value, key) => {
+    const lower = key.toLowerCase();
+    if (HOP_BY_HOP.has(lower)) return;
+    out[key] = value;
+  });
+
+  // Explicit auth recovery — some runtimes omit authorization from forEach.
+  const auth =
+    req.headers.get("authorization") ||
+    req.headers.get("Authorization") ||
+    req.headers.get("x-today-authorization");
+  if (auth) {
+    out.authorization = auth;
+  }
+  if (!out.accept) out.accept = "application/json";
+  return out;
+}
+
+function proxyRequest(
+  targetUrl: string,
+  method: string,
+  headers: http.OutgoingHttpHeaders,
+  body?: Buffer,
+): Promise<{ status: number; headers: http.IncomingHttpHeaders; body: Buffer }> {
+  const url = new URL(targetUrl);
+  const lib = url.protocol === "https:" ? https : http;
+
+  return new Promise((resolve, reject) => {
+    const req = lib.request(
+      {
+        protocol: url.protocol,
+        hostname: url.hostname,
+        port: url.port || (url.protocol === "https:" ? 443 : 80),
+        path: `${url.pathname}${url.search}`,
+        method,
+        headers,
+        timeout: 30000,
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (c) => chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)));
+        res.on("end", () => {
+          resolve({
+            status: res.statusCode ?? 502,
+            headers: res.headers,
+            body: Buffer.concat(chunks),
+          });
+        });
+      },
+    );
+    req.on("timeout", () => {
+      req.destroy(new Error("upstream timeout"));
+    });
+    req.on("error", reject);
+    if (body && body.length > 0) req.write(body);
+    req.end();
+  });
+}
+
 async function proxy(
   req: NextRequest,
   ctx: { params: Promise<{ path: string[] }> },
@@ -32,31 +109,25 @@ async function proxy(
   }
 
   const target = `${apiTarget()}/${path.join("/")}${req.nextUrl.search}`;
-  const headers = new Headers();
-  const contentType = req.headers.get("content-type");
-  const authorization = req.headers.get("authorization");
-  if (contentType) headers.set("content-type", contentType);
-  if (authorization) headers.set("authorization", authorization);
-  headers.set("accept", req.headers.get("accept") || "application/json");
+  const headers = upstreamHeaders(req);
 
-  const init: RequestInit = {
-    method: req.method,
-    headers,
-    redirect: "manual",
-    cache: "no-store",
-  };
-
+  let body: Buffer | undefined;
   if (req.method !== "GET" && req.method !== "HEAD") {
-    init.body = await req.arrayBuffer();
+    body = Buffer.from(await req.arrayBuffer());
+    headers["content-length"] = body.length;
   }
 
   try {
-    const upstream = await fetch(target, init);
-    const body = await upstream.arrayBuffer();
-    const out = new NextResponse(body, { status: upstream.status });
-    const upstreamType = upstream.headers.get("content-type");
-    if (upstreamType) out.headers.set("content-type", upstreamType);
-    return out;
+    const upstream = await proxyRequest(target, req.method, headers, body);
+    const outHeaders = new Headers();
+    const contentType = upstream.headers["content-type"];
+    if (typeof contentType === "string") {
+      outHeaders.set("content-type", contentType);
+    }
+    return new NextResponse(new Uint8Array(upstream.body), {
+      status: upstream.status,
+      headers: outHeaders,
+    });
   } catch (e) {
     return NextResponse.json(
       {

@@ -51,8 +51,14 @@ public class SecurityConfig {
         .exceptionHandling(
             ex ->
                 ex.authenticationEntryPoint(
-                        (request, response, authException) ->
-                            writeError(response, HttpStatus.UNAUTHORIZED, "unauthorized"))
+                        (request, response, authException) -> {
+                          Object detail = request.getAttribute("today.auth.error");
+                          String message =
+                              detail instanceof String s && !s.isBlank()
+                                  ? "unauthorized: " + s
+                                  : "unauthorized";
+                          writeError(response, HttpStatus.UNAUTHORIZED, message);
+                        })
                     .accessDeniedHandler(
                         (request, response, accessDeniedException) ->
                             writeError(response, HttpStatus.FORBIDDEN, "forbidden")))

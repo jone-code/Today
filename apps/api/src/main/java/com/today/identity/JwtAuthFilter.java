@@ -29,6 +29,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
     String header = request.getHeader(HttpHeaders.AUTHORIZATION);
+    if (header == null || header.isBlank()) {
+      header = request.getHeader("X-Today-Authorization");
+    }
     if (header != null
         && header.startsWith("Bearer ")
         && SecurityContextHolder.getContext().getAuthentication() == null) {
@@ -41,8 +44,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 principal, null, principal.getAuthorities());
         auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
         SecurityContextHolder.getContext().setAuthentication(auth);
-      } catch (Exception ignored) {
+      } catch (Exception e) {
         SecurityContextHolder.clearContext();
+        request.setAttribute(
+            "today.auth.error",
+            e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
       }
     }
     filterChain.doFilter(request, response);
