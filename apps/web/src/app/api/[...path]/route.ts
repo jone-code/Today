@@ -54,7 +54,8 @@ function upstreamHeaders(req: NextRequest): http.OutgoingHttpHeaders {
   if (auth) {
     out.authorization = auth;
   }
-  if (!out.accept) out.accept = "application/json";
+  // Do not force application/json — media GETs need image/* or */*.
+  if (!out.accept) out.accept = "*/*";
   return out;
 }
 
@@ -76,7 +77,7 @@ function proxyRequest(
         path: `${url.pathname}${url.search}`,
         method,
         headers,
-        timeout: 30000,
+        timeout: 60000,
       },
       (res) => {
         const chunks: Buffer[] = [];

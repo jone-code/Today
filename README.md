@@ -109,8 +109,8 @@ AI 自动整理、总结、建立长期记忆，并在未来主动关联。随�
 ### 一键全栈（推荐验证发布形态）
 
 ```bash
-cp .env.example .env   # 可选
-npm run stack:up       # mysql + qdrant + api + web
+bash scripts/deploy-docker.sh up   # 或 npm run deploy:docker
+# 等价：cp .env.example .env && npm run stack:up
 ```
 
 说明见 [`docs/deploy.md`](docs/deploy.md)。CI：推送 / PR 到 `main` 会跑 Maven 测试、Web lint/build、Docker 镜像构建。
@@ -157,4 +157,4 @@ TODAY_AUTH_TOKEN=<jwt> FILL_MISSING=true npm run vector:reindex
 
 AI 调用可观测见 [`docs/ai-observability.md`](docs/ai-observability.md)（`/health.ai`、`/v1/admin/ai/stats`）。
 
-当前状态：**前端已迁入 `apps/web` 并接入 TanStack Query**；Todo / 习惯打卡已落地；默认强制登录走 API；`aigateway` 已接通 OpenAI 兼容 LLM + Embedding 检索；checkin AI 流水线异步且可重试；记忆可管理；e2e 冒烟可用；向量检索可外挂 Qdrant 并可 reindex；AI 调用可审计；Compose 一键全栈 + GitHub Actions CI 可用。
+当前状态：**前端已迁入 `apps/web` 并接入 TanStack Query**；Todo / 习惯打卡已落地（支持本地目录照片打卡，`TODAY_MEDIA_PATH` 挂载）；默认强制登录走 API；`aigateway` 已接通 OpenAI 兼容 LLM + Embedding 检索；checkin AI 流水线异步且可重试；记忆可管理；e2e 冒烟可用；向量检索可外挂 Qdrant 并可 reindex；AI 调用可审计；Compose 一键全栈 + GitHub Actions CI 可用。

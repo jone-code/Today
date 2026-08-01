@@ -6,6 +6,11 @@ server:
 spring:
   application:
     name: today-api
+  servlet:
+    multipart:
+      # Keep in sync with today.media.max-bytes (default 10 MiB).
+      max-file-size: ${TODAY_MEDIA_MAX_FILE_SIZE:10MB}
+      max-request-size: ${TODAY_MEDIA_MAX_REQUEST_SIZE:12MB}
   datasource:
     url: ${MYSQL_URL:jdbc:mysql://localhost:3306/today?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8}
     username: ${MYSQL_USER:today}
@@ -52,3 +57,7 @@ today:
     api-key: ${TODAY_QDRANT_API_KEY:}
     timeout-ms: ${TODAY_QDRANT_TIMEOUT_MS:5000}
     admin-token: ${TODAY_VECTOR_ADMIN_TOKEN:}
+  media:
+    # Local directory for punch photos (Docker: mount host path → /data/media).
+    root: ${TODAY_MEDIA_ROOT:data/media}
+    max-bytes: ${TODAY_MEDIA_MAX_BYTES:10485760}

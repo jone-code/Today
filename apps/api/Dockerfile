@@ -20,7 +20,9 @@ RUN apt-get update \
 COPY --from=build /build/target/today-api-0.1.0.jar /app/app.jar
 COPY apps/api/docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod 755 /app/docker-entrypoint.sh \
-  && chown -R nobody:nogroup /app
+  && mkdir -p /data/media \
+  && chown -R nobody:nogroup /app /data/media
 USER nobody
 EXPOSE 3001
+VOLUME ["/data/media"]
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

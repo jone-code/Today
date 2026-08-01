@@ -12,6 +12,6 @@
 | `identity/` | 登录 / 注册 |
 | `reminder/` | 定时提醒 |
 | `todo/` | 待办 |
-| `punch/` | 习惯打卡 |
+| `punch/` | 习惯打卡（含照片打卡） |
 
 共享壳与 HTTP：`src/shared/`。完整选型见 [`docs/architecture.md`](../../../docs/architecture.md)。

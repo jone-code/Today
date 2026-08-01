@@ -27,6 +27,7 @@ export const PunchHabitDtoSchema = z.object({
   updatedAt: z.string().datetime(),
   punchedToday: z.boolean().optional(),
   streak: z.number().int().nonnegative().optional(),
+  todayPhotoUrl: z.string().nullable().optional(),
 });
 
 export type PunchHabitDto = z.infer<typeof PunchHabitDtoSchema>;
@@ -54,6 +55,7 @@ export const PunchLogDtoSchema = z.object({
   userId: z.string(),
   punchDate: z.string(),
   note: z.string().nullable(),
+  photoUrl: z.string().nullable().optional(),
   createdAt: z.string().datetime(),
 });
 

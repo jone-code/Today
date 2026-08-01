@@ -2,6 +2,7 @@ package com.today.health;
 
 import com.today.aigateway.AiCallObserver;
 import com.today.aigateway.AiGatewayService;
+import com.today.media.LocalMediaStorage;
 import com.today.vector.VectorHealth;
 import com.today.vector.VectorReindexService;
 import com.today.vector.VectorStore;
@@ -18,16 +19,19 @@ public class HealthController {
   private final AiCallObserver aiCallObserver;
   private final VectorStore vectorStore;
   private final VectorReindexService vectorReindex;
+  private final LocalMediaStorage mediaStorage;
 
   public HealthController(
       AiGatewayService aiGateway,
       AiCallObserver aiCallObserver,
       VectorStore vectorStore,
-      VectorReindexService vectorReindex) {
+      VectorReindexService vectorReindex,
+      LocalMediaStorage mediaStorage) {
     this.aiGateway = aiGateway;
     this.aiCallObserver = aiCallObserver;
     this.vectorStore = vectorStore;
     this.vectorReindex = vectorReindex;
+    this.mediaStorage = mediaStorage;
   }
 
   /** Liveness for Docker healthcheck — no DB / vector calls. */
@@ -57,6 +61,9 @@ public class HealthController {
       vector.put("detail", e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
       body.put("vector", vector);
     }
+    Map<String, Object> media = new LinkedHashMap<>();
+    media.put("root", mediaStorage.getRoot().toString());
+    body.put("media", media);
     body.put(
         "modules",
         List.of(
@@ -70,7 +77,8 @@ public class HealthController {
             "identity",
             "reminder",
             "todo",
-            "punch"));
+            "punch",
+            "media"));
     return body;
   }
 }

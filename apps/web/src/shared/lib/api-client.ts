@@ -421,6 +421,7 @@ export type PunchHabitDto = {
   updatedAt: string;
   punchedToday: boolean;
   streak: number;
+  todayPhotoUrl?: string | null;
 };
 
 export type PunchLogDto = {
@@ -429,6 +430,7 @@ export type PunchLogDto = {
   userId: string;
   punchDate: string;
   note: string | null;
+  photoUrl?: string | null;
   createdAt: string;
 };
 
@@ -527,6 +529,72 @@ export async function apiPunchHabit(
     method: "POST",
     body: JSON.stringify(input ?? {}),
   });
+}
+
+export async function apiPunchHabitWithPhoto(
+  id: string,
+  photo: File,
+  input?: { date?: string; note?: string | null },
+): Promise<PunchLogDto> {
+  const controller = new AbortController();
+  const timeoutMs = 60000;
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const token = getAuthToken();
+    const form = new FormData();
+    form.append("photo", photo);
+    if (input?.date) form.append("date", input.date);
+    if (input?.note != null && input.note !== "") {
+      form.append("note", input.note);
+    }
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers.authorization = `Bearer ${token}`;
+      headers["x-today-authorization"] = `Bearer ${token}`;
+    }
+    const res = await fetch(
+      `${getApiBaseUrl()}/v1/punch/habits/${encodeURIComponent(id)}/punch`,
+      {
+        method: "POST",
+        headers,
+        body: form,
+        signal: controller.signal,
+      },
+    );
+    const text = await res.text();
+    if (!res.ok) {
+      let parsed: ApiError | undefined;
+      try {
+        parsed = text ? (JSON.parse(text) as ApiError) : undefined;
+      } catch {
+        // ignore
+      }
+      throw new Error(
+        parsed?.message || `API request failed: ${res.status} ${res.statusText}`,
+      );
+    }
+    if (!text) return undefined as unknown as PunchLogDto;
+    return JSON.parse(text) as PunchLogDto;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/** Fetch an authenticated media URL as an object URL (revoke when done). */
+export async function apiFetchMediaObjectUrl(mediaPath: string): Promise<string> {
+  const path = mediaPath.startsWith("/") ? mediaPath : `/${mediaPath}`;
+  const token = getAuthToken();
+  const headers: Record<string, string> = { accept: "*/*" };
+  if (token) {
+    headers.authorization = `Bearer ${token}`;
+    headers["x-today-authorization"] = `Bearer ${token}`;
+  }
+  const res = await fetch(`${getApiBaseUrl()}${path}`, { headers });
+  if (!res.ok) {
+    throw new Error(`failed to load media: ${res.status}`);
+  }
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
 }
 
 export async function apiUnpunchHabit(

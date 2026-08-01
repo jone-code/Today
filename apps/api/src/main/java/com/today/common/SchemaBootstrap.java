@@ -33,7 +33,8 @@ public class SchemaBootstrap {
     "db/migration-memory-manage.sql",
     "db/migration-proactive-events.sql",
     "db/migration-checkin-ai-jobs.sql",
-    "db/migration-ai-call-logs.sql"
+    "db/migration-ai-call-logs.sql",
+    "db/migration-punch-photo.sql"
   };
 
   private static final String[] REQUIRED = {

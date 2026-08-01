@@ -27,6 +27,10 @@ apps/*/dist
 packages/*/dist
 **/target/
 
+# local media uploads (punch photos)
+/data/media/
+data/media/
+
 # misc
 .DS_Store
 *.pem

@@ -9,4 +9,5 @@ public record PunchHabitDto(
     String createdAt,
     String updatedAt,
     boolean punchedToday,
-    int streak) {}
+    int streak,
+    String todayPhotoUrl) {}

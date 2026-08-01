@@ -6,6 +6,25 @@
 
 前置：Docker / Docker Compose v2。
 
+推荐用部署脚本（自动准备 `.env`、媒体目录、健康检查、DB 迁移）：
+
+```bash
+bash scripts/deploy-docker.sh up
+# 或：npm run deploy:docker
+```
+
+常用子命令：
+
+```bash
+bash scripts/deploy-docker.sh status
+bash scripts/deploy-docker.sh logs          # api + web
+bash scripts/deploy-docker.sh health
+bash scripts/deploy-docker.sh down          # 停服务，保留数据卷
+bash scripts/deploy-docker.sh down -v       # 停服务并清空数据卷
+```
+
+等价手工步骤：
+
 ```bash
 cp .env.example .env   # 可选；按需改密钥与 OPENAI_API_KEY
 npm run stack:up       # 等价 docker compose up -d --build
@@ -80,6 +99,9 @@ docker exec today-mysql mysql -uroot -proot -e "USE today; SHOW TABLES LIKE 'che
 - `TODAY_JWT_SECRET`：共享/生产环境务必更换。
 - `OPENAI_API_KEY`：有则走真实 LLM；无则 Heuristic 降级，本地可跑通主链路。
 - `TODAY_VECTOR_PROVIDER=qdrant`：API 容器内已指向 `http://qdrant:6333`。
+- `TODAY_MEDIA_PATH`：宿主机打卡照片目录（默认 `./data/media`），挂载到容器 `/data/media`。
+- `TODAY_MEDIA_ROOT`：API 进程内媒体根路径（Compose 默认 `/data/media`，与 volume 对齐）。
+- Linux 若上传报权限错误：`mkdir -p data/media && chmod 777 data/media`（容器以 `nobody` 写入）。
 
 ### 仅基础设施
 

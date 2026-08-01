@@ -9,6 +9,7 @@ public class PunchLogEntity {
   private String userId;
   private LocalDate punchDate;
   private String note;
+  private String photoPath;
   private Instant createdAt;
 
   public String getId() {
@@ -49,6 +50,14 @@ public class PunchLogEntity {
 
   public void setNote(String note) {
     this.note = note;
+  }
+
+  public String getPhotoPath() {
+    return photoPath;
+  }
+
+  public void setPhotoPath(String photoPath) {
+    this.photoPath = photoPath;
   }
 
   public Instant getCreatedAt() {

@@ -120,6 +120,7 @@ CREATE TABLE IF NOT EXISTS punch_logs (
   user_id VARCHAR(64) NOT NULL,
   punch_date DATE NOT NULL,
   note VARCHAR(512) NULL,
+  photo_path VARCHAR(512) NULL,
   created_at DATETIME(3) NOT NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uk_punch_habit_date (habit_id, punch_date),

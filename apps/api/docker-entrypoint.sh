@@ -7,6 +7,10 @@ MYSQL_TCP_PORT="${MYSQL_TCP_PORT:-3306}"
 MYSQL_WAIT_TRIES="${MYSQL_WAIT_TRIES:-60}"
 APP_PORT="${PORT:-3001}"
 APP_ADDRESS="${SERVER_ADDRESS:-0.0.0.0}"
+MEDIA_ROOT="${TODAY_MEDIA_ROOT:-/data/media}"
+
+mkdir -p "${MEDIA_ROOT}" 2>/dev/null || true
+echo "media root: ${MEDIA_ROOT}"
 
 echo "waiting for MySQL ${MYSQL_HOST}:${MYSQL_TCP_PORT} ..."
 for i in $(seq 1 "$MYSQL_WAIT_TRIES"); do

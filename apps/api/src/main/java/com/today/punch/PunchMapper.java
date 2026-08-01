@@ -31,6 +31,8 @@ public interface PunchMapper {
 
   int insertLog(PunchLogEntity entity);
 
+  int updateLog(PunchLogEntity entity);
+
   int deleteLog(
       @Param("habitId") String habitId,
       @Param("userId") String userId,

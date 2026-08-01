@@ -79,6 +79,8 @@ npm run dev:api
 | `OPENAI_JSON_RESPONSE_FORMAT` | `true` | 不支持 `response_format` 的网关可设 `false` |
 | `OPENAI_RETRIEVE_TOP_K` | `5` | proactive 记忆检索条数 |
 | `TODAY_AI_ASYNC_CHECKIN` | `true` | checkin 后异步跑 AI；`false` 同步 |
+| `TODAY_MEDIA_ROOT` | `data/media` | 打卡照片本地目录（Docker 建议 `/data/media`） |
+| `TODAY_MEDIA_MAX_BYTES` | `10485760` | 单张照片上限（字节） |
 
 ## 认证
 
@@ -101,6 +103,9 @@ npm run dev:api
 
 - Todos：`GET/POST /v1/todos`，`PUT/DELETE /v1/todos/{id}`，`POST /v1/todos/{id}/toggle`
 - Punch：`GET/POST /v1/punch/habits`，`PUT/DELETE /v1/punch/habits/{id}`，`POST/DELETE /v1/punch/habits/{id}/punch`
+  - JSON 打卡：`Content-Type: application/json`
+  - 照片打卡：`multipart/form-data`，字段 `photo`（可选 `date` / `note`）
+- Media：`GET /v1/media/{path}`（需登录；仅本人 `punch/{userId}/...`）
 
 已有库迁移（推荐一键，幂等）：
 
@@ -113,5 +118,6 @@ npm run db:migrate
 - `src/main/resources/db/migration-auth-reminder.sql`
 - `src/main/resources/db/migration-memory-embedding.sql`
 - `src/main/resources/db/migration-todo-punch.sql`
+- `src/main/resources/db/migration-punch-photo.sql`
 
 表结构完整版见 `src/main/resources/db/schema.sql`。

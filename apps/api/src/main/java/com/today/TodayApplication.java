@@ -1,6 +1,7 @@
 package com.today;
 
 import com.today.aigateway.AiProperties;
+import com.today.media.MediaProperties;
 import com.today.vector.VectorProperties;
 import org.apache.ibatis.annotations.Mapper;
 import org.mybatis.spring.annotation.MapperScan;
@@ -13,7 +14,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 // Only interfaces annotated with @Mapper — avoids treating VectorStore etc. as MyBatis mappers.
 @MapperScan(value = "com.today", annotationClass = Mapper.class)
 @EnableScheduling
-@EnableConfigurationProperties({AiProperties.class, VectorProperties.class})
+@EnableConfigurationProperties({AiProperties.class, VectorProperties.class, MediaProperties.class})
 public class TodayApplication {
 
   public static void main(String[] args) {

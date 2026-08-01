@@ -66,6 +66,7 @@ MIGRATIONS=(
   migration-proactive-events.sql
   migration-checkin-ai-jobs.sql
   migration-ai-call-logs.sql
+  migration-punch-photo.sql
 )
 
 if [[ ! -f "$SCHEMA" ]]; then

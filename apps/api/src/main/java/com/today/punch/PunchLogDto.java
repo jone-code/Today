@@ -6,4 +6,5 @@ public record PunchLogDto(
     String userId,
     String punchDate,
     String note,
+    String photoUrl,
     String createdAt) {}

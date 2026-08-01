@@ -19,6 +19,7 @@
     <result property="userId" column="user_id"/>
     <result property="punchDate" column="punch_date"/>
     <result property="note" column="note"/>
+    <result property="photoPath" column="photo_path"/>
     <result property="createdAt" column="created_at"/>
   </resultMap>
 
@@ -61,7 +62,7 @@
   </delete>
 
   <select id="findLog" resultMap="LogMap">
-    SELECT id, habit_id, user_id, punch_date, note, created_at
+    SELECT id, habit_id, user_id, punch_date, note, photo_path, created_at
     FROM punch_logs
     WHERE habit_id = #{habitId}
       AND punch_date = #{punchDate}
@@ -69,7 +70,7 @@
   </select>
 
   <select id="listLogsByHabit" resultMap="LogMap">
-    SELECT id, habit_id, user_id, punch_date, note, created_at
+    SELECT id, habit_id, user_id, punch_date, note, photo_path, created_at
     FROM punch_logs
     WHERE habit_id = #{habitId}
     ORDER BY punch_date DESC
@@ -77,7 +78,7 @@
   </select>
 
   <select id="listLogsByUserAndDate" resultMap="LogMap">
-    SELECT id, habit_id, user_id, punch_date, note, created_at
+    SELECT id, habit_id, user_id, punch_date, note, photo_path, created_at
     FROM punch_logs
     WHERE user_id = #{userId}
       AND punch_date = #{punchDate}
@@ -85,11 +86,19 @@
 
   <insert id="insertLog">
     INSERT INTO punch_logs (
-      id, habit_id, user_id, punch_date, note, created_at
+      id, habit_id, user_id, punch_date, note, photo_path, created_at
     ) VALUES (
-      #{id}, #{habitId}, #{userId}, #{punchDate}, #{note}, #{createdAt}
+      #{id}, #{habitId}, #{userId}, #{punchDate}, #{note}, #{photoPath}, #{createdAt}
     )
   </insert>
+
+  <update id="updateLog">
+    UPDATE punch_logs
+    SET note = #{note},
+        photo_path = #{photoPath}
+    WHERE id = #{id}
+      AND user_id = #{userId}
+  </update>
 
   <delete id="deleteLog">
     DELETE FROM punch_logs
