@@ -13,7 +13,6 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /** 存量记忆 → embedding 补齐 → VectorStore 同步 */
 @Service
@@ -27,16 +26,19 @@ public class VectorReindexService {
   private final AiGatewayService aiGateway;
   private final VectorStore vectorStore;
   private final IdentityService identity;
+  private final VectorSyncJobMapper vectorJobs;
 
   public VectorReindexService(
       MemoryMapper memoryMapper,
       AiGatewayService aiGateway,
       VectorStore vectorStore,
-      IdentityService identity) {
+      IdentityService identity,
+      VectorSyncJobMapper vectorJobs) {
     this.memoryMapper = memoryMapper;
     this.aiGateway = aiGateway;
     this.vectorStore = vectorStore;
     this.identity = identity;
+    this.vectorJobs = vectorJobs;
   }
 
   public VectorHealth health() {
@@ -44,14 +46,12 @@ public class VectorReindexService {
   }
 
   /** 当前用户：把 MySQL 记忆同步到向量索引；可选补齐缺失 embedding */
-  @Transactional
   public VectorReindexResult reindexCurrentUser(boolean fillMissingEmbeddings, boolean recreate) {
     String userId = identity.getCurrentUserId();
     return reindex(userId, fillMissingEmbeddings, recreate);
   }
 
   /** 全量（所有用户） */
-  @Transactional
   public VectorReindexResult reindexAll(boolean fillMissingEmbeddings, boolean recreate) {
     return reindex(null, fillMissingEmbeddings, recreate);
   }
@@ -80,18 +80,27 @@ public class VectorReindexService {
       }
       scanned += page.size();
 
+      List<MemoryEntity> eligible = new ArrayList<>();
+      for (MemoryEntity entity : page) {
+        MemoryEntity current = memoryMapper.findConfirmedById(entity.getId(), entity.getUserId());
+        if (current == null) {
+          vectorJobs.enqueue(entity.getId(), entity.getUserId(), EntityMapper.now());
+          skipped++;
+        } else {
+          eligible.add(current);
+        }
+      }
+
       if (fillMissingEmbeddings) {
-        embedded += fillMissing(page);
+        embedded += fillMissing(eligible);
       }
 
       List<MemoryVectorRecord> batch = new ArrayList<>();
-      for (MemoryEntity entity : page) {
-        float[] vec = JsonUtils.fromJsonFloatArray(entity.getEmbeddingJson());
-        if (vec == null) {
-          skipped++;
-          continue;
-        }
-        if (vec.length == 0) {
+      for (MemoryEntity before : eligible) {
+        MemoryEntity entity = memoryMapper.findConfirmedById(before.getId(), before.getUserId());
+        float[] vec = entity == null ? null : JsonUtils.fromJsonFloatArray(entity.getEmbeddingJson());
+        if (vec == null || vec.length == 0) {
+          vectorJobs.enqueue(before.getId(), before.getUserId(), EntityMapper.now());
           skipped++;
           continue;
         }
@@ -145,7 +154,7 @@ public class VectorReindexService {
   private int fillMissing(List<MemoryEntity> page) {
     List<MemoryEntity> need = new ArrayList<>();
     for (MemoryEntity e : page) {
-      if (e.getEmbeddingJson() == null || e.getEmbeddingJson().isBlank()) {
+      if (!e.isArchived() && (e.getEmbeddingJson() == null || e.getEmbeddingJson().isBlank())) {
         need.add(e);
       }
     }
@@ -160,13 +169,13 @@ public class VectorReindexService {
     }
     Instant now = EntityMapper.now();
     List<float[]> vecs = vectors.get();
+    int updated = 0;
     for (int i = 0; i < need.size(); i++) {
       MemoryEntity entity = need.get(i);
-      entity.setEmbeddingJson(JsonUtils.toJsonFloatArray(vecs.get(i)));
-      entity.setUpdatedAt(now);
-      memoryMapper.update(entity);
+      updated += memoryMapper.updateEmbeddingIfConfirmed(entity.getId(), entity.getUserId(),
+          entity.getMemoryText(), entity.getUpdatedAt(), JsonUtils.toJsonFloatArray(vecs.get(i)), now);
     }
-    return need.size();
+    return updated;
   }
 
   private int flush(List<MemoryVectorRecord> batch) {
@@ -174,8 +183,12 @@ public class VectorReindexService {
       vectorStore.upsertAll(List.copyOf(batch));
       return 0;
     } catch (Exception e) {
-      log.warn("reindex upsert batch failed size={} reason={}", batch.size(), e.toString());
+      log.warn("reindex upsert batch failed size={} errorCode={}", batch.size(), e.getClass().getSimpleName());
       return batch.size();
+    } finally {
+      for (MemoryVectorRecord record : batch) {
+        vectorJobs.enqueue(record.memoryId(), record.userId(), EntityMapper.now());
+      }
     }
   }
 }

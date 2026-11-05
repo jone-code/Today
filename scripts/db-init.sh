@@ -56,6 +56,67 @@ REQUIRED_TABLES=(
   proactive_prompt_events
   checkin_ai_jobs
   ai_call_logs
+  agent_profiles
+  agent_media
+  conversations
+  conversation_messages
+  agent_proposals
+  agent_action_logs
+  memory_sources
+  vector_sync_jobs
+  checkin_memory_candidates
+  followup_topics
+  one_off_appointments
+  followup_preferences
+  inbox_items
+  api_rate_limits
+  create_requests
+  punch_photo_cleanup_jobs
+  feedback_reports
+)
+
+REQUIRED_COLUMNS=(
+  conversations:deleted_at
+  conversations:client_request_id
+  conversation_messages:deleted_at
+  conversation_messages:generation_attempt
+  conversation_messages:generation_started_at
+  conversation_messages:client_message_id
+  agent_proposals:source_message_id
+  agent_proposals:status
+  agent_action_logs:undo_snapshot_json
+  agent_action_logs:undone_at
+  memory_sources:active
+  vector_sync_jobs:version
+  vector_sync_jobs:lease_until
+  checkin_memory_candidates:source_hash
+  checkin_memory_candidates:status
+  followup_topics:source_conversation_id
+  one_off_appointments:source_conversation_id
+  inbox_items:source_id
+  punch_photo_cleanup_jobs:lease_until
+  agent_media:next_cleanup_at
+  create_requests:response_json
+  create_requests:request_hash
+  feedback_reports:deleted_at
+)
+
+REQUIRED_UNIQUE_INDEXES=(
+  conversations:uk_conversation_client_request
+  conversation_messages:uk_conversation_client_message
+  conversation_messages:uk_conversation_reply
+  agent_proposals:uk_agent_proposal_source_kind
+  checkin_memory_candidates:uk_checkin_candidate_version
+  one_off_appointments:uk_one_off_proposal
+  inbox_items:uk_inbox_source_schedule
+  api_rate_limits:PRIMARY
+  create_requests:uk_create_request
+)
+
+REQUIRED_INDEXES=(
+  punch_logs:idx_punch_logs_user_photo
+  agent_media:idx_agent_media_cleanup_due
+  feedback_reports:idx_feedback_owner
 )
 
 MIGRATIONS=(
@@ -67,6 +128,14 @@ MIGRATIONS=(
   migration-checkin-ai-jobs.sql
   migration-ai-call-logs.sql
   migration-punch-photo.sql
+  migration-agent-conversation.sql
+  migration-conversation-create-idempotency.sql
+  migration-rate-limits.sql
+  migration-create-idempotency.sql
+  migration-punch-photo-cleanup.sql
+  migration-agent-media-cleanup.sql
+  migration-feedback-reports.sql
+  migration-agent-action-undo.sql
 )
 
 if [[ ! -f "$SCHEMA" ]]; then
@@ -105,7 +174,7 @@ run_mysql < "$SCHEMA"
 for file in "${MIGRATIONS[@]}"; do
   path="$DB_DIR/$file"
   echo "→ $file"
-  run_mysql < "$path"
+  run_mysql "$MYSQL_DATABASE" < "$path"
 done
 
 echo
@@ -130,13 +199,49 @@ for t in "${REQUIRED_TABLES[@]}"; do
   fi
 done
 
+for entry in "${REQUIRED_COLUMNS[@]}"; do
+  table="${entry%%:*}"
+  column="${entry#*:}"
+  exists="$(run_mysql -N -e "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='${MYSQL_DATABASE}' AND table_name='${table}' AND column_name='${column}';")"
+  if [[ "$exists" == "1" ]]; then
+    echo "  OK  $entry"
+  else
+    echo "  MISSING  $entry" >&2
+    missing=1
+  fi
+done
+
+for entry in "${REQUIRED_UNIQUE_INDEXES[@]}"; do
+  table="${entry%%:*}"
+  index="${entry#*:}"
+  exists="$(run_mysql -N -e "SELECT COUNT(DISTINCT index_name) FROM information_schema.statistics WHERE table_schema='${MYSQL_DATABASE}' AND table_name='${table}' AND index_name='${index}' AND non_unique=0;")"
+  if [[ "$exists" == "1" ]]; then
+    echo "  OK  $entry"
+  else
+    echo "  MISSING  $entry" >&2
+    missing=1
+  fi
+done
+
+for entry in "${REQUIRED_INDEXES[@]}"; do
+  table="${entry%%:*}"
+  index="${entry#*:}"
+  exists="$(run_mysql -N -e "SELECT COUNT(DISTINCT index_name) FROM information_schema.statistics WHERE table_schema='${MYSQL_DATABASE}' AND table_name='${table}' AND index_name='${index}';")"
+  if [[ "$exists" == "1" ]]; then
+    echo "  OK  $entry"
+  else
+    echo "  MISSING  $entry" >&2
+    missing=1
+  fi
+done
+
 if [[ "$missing" -ne 0 ]]; then
   echo >&2
-  echo "ERROR: schema incomplete. API will fail (e.g. checkin_ai_jobs)." >&2
+  echo "ERROR: schema incomplete. API will refuse to start; repair the missing migration requirements." >&2
   echo "Retry: npm run db:init:docker" >&2
   exit 1
 fi
 
 echo
-echo "Done. Required tables present (including checkin_ai_jobs, ai_call_logs)."
+echo "Done. Required tables, columns and indexes present."
 echo "Restart API if it was already running: docker compose restart api"

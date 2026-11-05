@@ -24,6 +24,15 @@ export const MemoryDtoSchema = z.object({
 
 export type MemoryDto = z.infer<typeof MemoryDtoSchema>;
 
+export const MemoryOriginSchema = z.object({
+  kind: z.enum(["checkin", "conversation"]),
+  sourceId: z.string(),
+  date: z.string().nullable(),
+  conversationId: z.string().nullable(),
+});
+
+export type MemoryOrigin = z.infer<typeof MemoryOriginSchema>;
+
 export const MemoryUpdateRequestSchema = z.object({
   text: z.string().min(1).max(512).optional(),
   category: MemoryCategorySchema.optional(),

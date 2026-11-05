@@ -18,12 +18,17 @@ node_modules
 /out/
 apps/web/.next/
 apps/web/out/
+apps/mobile/.expo/
+apps/mobile/android/
+apps/mobile/ios/
 
 
 # production
 /build
 dist
 apps/*/dist
+apps/mobile/dist-android/
+apps/mobile/dist-ios/
 packages/*/dist
 **/target/
 

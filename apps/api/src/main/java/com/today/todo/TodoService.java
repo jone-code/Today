@@ -6,6 +6,7 @@ import com.today.persistence.TodoEntity;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -33,6 +34,28 @@ public class TodoService {
     List<TodoDto> items =
         todoMapper.listByUserId(userId, filter).stream().map(this::toDto).toList();
     return new TodoListDto(items);
+  }
+
+  public List<TodoDto> listForAgent(int limit) {
+    return todoMapper.listForAgent(identity.getCurrentUserId(), Math.min(20, Math.max(1, limit)))
+        .stream().map(this::toDto).toList();
+  }
+
+  @Transactional
+  public TodoDto updateFromAgent(String id, TodoDto before, TodoUpdateRequest change) {
+    String userId = identity.getCurrentUserId();
+    TodoEntity current = todoMapper.lockByIdAndUser(id, userId);
+    if (current == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "todo not found");
+    if (!id.equals(before.id()) || !userId.equals(before.userId())
+        || !current.getUpdatedAt().toString().equals(before.updatedAt())
+        || !current.getTitle().equals(before.title())
+        || !Objects.equals(current.getNote(), before.note())
+        || !Objects.equals(current.getStatus(), before.status())
+        || !Objects.equals(current.getDueDate() == null ? null : current.getDueDate().toString(), before.dueDate())) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "todo changed; review the latest details");
+    }
+    update(id, change);
+    return toDto(todoMapper.lockByIdAndUser(id, userId));
   }
 
   @Transactional

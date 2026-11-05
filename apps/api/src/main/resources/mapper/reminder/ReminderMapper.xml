@@ -34,6 +34,11 @@
     LIMIT 1
   </select>
 
+  <select id="lockOwned" resultMap="ReminderEntityMap">
+    SELECT id, user_id, title, message, remind_time, timezone, enabled, created_at, updated_at
+    FROM reminders WHERE id = #{id} AND user_id = #{userId} FOR UPDATE
+  </select>
+
   <select id="listByUserId" resultMap="ReminderEntityMap">
     SELECT id, user_id, title, message, remind_time, timezone, enabled, created_at, updated_at
     FROM reminders

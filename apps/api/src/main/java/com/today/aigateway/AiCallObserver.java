@@ -159,7 +159,7 @@ public class AiCallObserver {
       entity.setCreatedAt(EntityMapper.now());
       logs.insert(entity);
     } catch (Exception e) {
-      log.warn("ai call log persist failed reason={}", e.toString());
+      log.warn("ai call log persist failed errorCode={}", e.getClass().getSimpleName());
     }
   }
 

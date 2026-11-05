@@ -4,11 +4,14 @@
   "private": true,
   "workspaces": [
     "apps/web",
+    "apps/mobile",
     "packages/*"
   ],
   "scripts": {
     "dev": "npm run dev -w @today/web",
     "dev:web": "npm run dev -w @today/web",
+    "dev:mobile": "npm run start -w @today/mobile",
+    "typecheck:mobile": "npm run typecheck -w @today/mobile",
     "dev:api": "cd apps/api && mvn spring-boot:run",
     "db:up": "docker compose up -d mysql",
     "vector:up": "docker compose up -d qdrant",

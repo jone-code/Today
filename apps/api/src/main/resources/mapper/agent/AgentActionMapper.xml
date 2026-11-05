@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.today.agent.AgentActionMapper">
+  <resultMap id="ActionMap" type="com.today.agent.AgentActionEntity">
+    <id property="proposalId" column="proposal_id"/>
+    <result property="kind" column="kind"/>
+    <result property="targetId" column="target_id"/>
+    <result property="summary" column="summary"/>
+    <result property="result" column="result"/>
+    <result property="executedAt" column="executed_at"/>
+    <result property="undoSnapshotJson" column="undo_snapshot_json"/>
+    <result property="undoneAt" column="undone_at"/>
+  </resultMap>
+  <insert id="insert">INSERT INTO agent_action_logs (proposal_id,user_id,kind,target_id,summary,result,executed_at) VALUES (#{proposalId},#{userId},#{kind},#{targetId},#{summary},'succeeded',#{executedAt})</insert>
+  <update id="attachUndoSnapshot">UPDATE agent_action_logs SET undo_snapshot_json=#{snapshot} WHERE proposal_id=#{proposalId} AND user_id=#{userId} AND result='succeeded' AND undo_snapshot_json IS NULL</update>
+  <select id="lockOwned" resultMap="ActionMap">SELECT proposal_id,kind,target_id,summary,result,executed_at,undo_snapshot_json,undone_at FROM agent_action_logs WHERE proposal_id=#{proposalId} AND user_id=#{userId} FOR UPDATE</select>
+  <update id="markUndone">UPDATE agent_action_logs SET result='undone',undone_at=#{undoneAt} WHERE proposal_id=#{proposalId} AND user_id=#{userId} AND result='succeeded' AND undo_snapshot_json IS NOT NULL</update>
+  <select id="list" resultMap="ActionMap">SELECT proposal_id,kind,target_id,summary,result,executed_at,undo_snapshot_json,undone_at FROM agent_action_logs WHERE user_id=#{userId} ORDER BY executed_at DESC LIMIT #{limit}</select>
+  <update id="redactByConversation">UPDATE agent_action_logs a JOIN agent_proposals p ON p.id=a.proposal_id AND p.user_id=a.user_id JOIN conversation_messages m ON m.id=p.source_message_id AND m.user_id=a.user_id SET a.summary='来源已删除', a.result='revoked' WHERE a.user_id=#{userId} AND m.conversation_id=#{conversationId} AND a.kind IN ('memory','followup','one_off_reminder')</update>
+</mapper>

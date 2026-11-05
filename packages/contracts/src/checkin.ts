@@ -21,3 +21,19 @@ export const CheckinDtoSchema = z.object({
 });
 
 export type CheckinDto = z.infer<typeof CheckinDtoSchema>;
+
+export const CheckinMemoryCandidateSchema = z.object({
+  id: z.string(),
+  checkinId: z.string(),
+  category: z.string(),
+  text: z.string(),
+  status: z.enum(["pending", "confirmed", "rejected", "invalidated"]),
+  createdAt: z.string().datetime(),
+  confirmedAt: z.string().datetime().nullable(),
+});
+
+export type CheckinMemoryCandidate = z.infer<typeof CheckinMemoryCandidateSchema>;
+
+export const CheckinMemoryCandidateConfirmSchema = z.object({
+  text: z.string().trim().min(1).max(512),
+});

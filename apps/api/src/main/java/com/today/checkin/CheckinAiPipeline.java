@@ -1,6 +1,5 @@
 package com.today.checkin;
 
-import com.today.memory.MemoryService;
 import com.today.persistence.CheckinAiJobEntity;
 import com.today.proactive.ProactiveService;
 import com.today.summary.SummaryService;
@@ -10,14 +9,14 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-/** checkin 提交后的 AI 慢路径：summary → memory → 关闭已回应追问；结果写入 checkin_ai_jobs */
+/** checkin 提交后的 AI 慢路径：summary → 关闭已回应追问；结果写入 checkin_ai_jobs */
 @Service
 public class CheckinAiPipeline {
 
   private static final Logger log = LoggerFactory.getLogger(CheckinAiPipeline.class);
 
   private final SummaryService summaries;
-  private final MemoryService memories;
+  private final CheckinMemoryCandidateService memoryCandidates;
   private final ProactiveService proactive;
   private final CheckinAiJobMapper jobs;
   private final CheckinService checkins;
@@ -25,13 +24,13 @@ public class CheckinAiPipeline {
 
   public CheckinAiPipeline(
       SummaryService summaries,
-      MemoryService memories,
+      CheckinMemoryCandidateService memoryCandidates,
       ProactiveService proactive,
       CheckinAiJobMapper jobs,
       CheckinService checkins,
       @Lazy CheckinAiJobService jobService) {
     this.summaries = summaries;
-    this.memories = memories;
+    this.memoryCandidates = memoryCandidates;
     this.proactive = proactive;
     this.jobs = jobs;
     this.checkins = checkins;
@@ -81,37 +80,43 @@ public class CheckinAiPipeline {
         return;
       }
     }
+    if (!CheckinAiJobStatus.running.name().equals(job.getStatus()) || job.getLockedAt() == null) return;
 
     try {
       String text = resolveRawText(checkinId, rawText);
       runPipeline(userId, checkinId, date, text);
-      jobService.markSucceeded(job.getId());
+      jobService.markSucceeded(job.getId(), job.getLockedAt());
       log.info(
           "checkin ai pipeline ok userId={} checkinId={} jobId={} elapsedMs={}",
           userId,
           checkinId,
           job.getId(),
           System.currentTimeMillis() - start);
+    } catch (StaleCheckinException e) {
+      jobService.rescheduleStale(job.getId(), job.getLockedAt());
+      log.info("checkin changed during AI processing checkinId={}", checkinId);
     } catch (Exception e) {
       CheckinAiJobEntity latest = jobs.findByCheckinId(checkinId);
       int attempts = latest == null ? 1 : latest.getAttempts();
       int max = latest == null ? 5 : latest.getMaxAttempts();
-      jobService.markFailed(job.getId(), attempts, max, e.toString());
+      String errorCode = e.getClass().getSimpleName();
+      jobService.markFailed(job.getId(), job.getLockedAt(), attempts, max, errorCode);
       log.error(
-          "checkin ai pipeline failed userId={} checkinId={} jobId={} elapsedMs={} reason={}",
+          "checkin ai pipeline failed userId={} checkinId={} jobId={} elapsedMs={} errorCode={}",
           userId,
           checkinId,
           job.getId(),
           System.currentTimeMillis() - start,
-          e.toString(),
-          e);
+          errorCode);
     }
   }
 
   private void runPipeline(String userId, String checkinId, String date, String rawText) {
     summaries.generateForCheckin(userId, checkinId, date, rawText);
-    memories.upsertFromCheckin(userId, rawText);
-    proactive.markAnsweredFromCheckin(userId, date, rawText);
+    memoryCandidates.generate(userId, checkinId, rawText);
+    CheckinDto current = checkins.findByIdForPipeline(checkinId);
+    if (current == null || !rawText.equals(current.rawText())) throw new StaleCheckinException();
+    proactive.markAnsweredFromCheckin(userId, checkinId, date, rawText);
   }
 
   private String resolveRawText(String checkinId, String rawText) {

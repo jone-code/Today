@@ -11,8 +11,12 @@ public interface CheckinMapper {
 
   CheckinEntity findByUserIdAndDate(
       @Param("userId") String userId, @Param("checkinDate") LocalDate checkinDate);
+  CheckinEntity lockByUserIdAndDate(
+      @Param("userId") String userId, @Param("checkinDate") LocalDate checkinDate);
 
   CheckinEntity findById(@Param("id") String id);
+  CheckinEntity findOwnedById(@Param("id") String id, @Param("userId") String userId);
+  CheckinEntity lockById(@Param("id") String id, @Param("userId") String userId);
 
   List<CheckinEntity> listRecentByUserId(
       @Param("userId") String userId, @Param("limit") int limit);

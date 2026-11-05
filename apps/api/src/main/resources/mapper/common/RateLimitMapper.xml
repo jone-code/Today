@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.today.common.RateLimitMapper">
+  <update id="increment">UPDATE api_rate_limits SET hit_count=hit_count+1 WHERE scope=#{scope} AND subject_hash=#{subjectHash} AND window_start=#{windowStart} AND hit_count &lt; #{maxHits}</update>
+  <insert id="insertFirst">INSERT IGNORE INTO api_rate_limits (scope,subject_hash,window_start,hit_count) VALUES (#{scope},#{subjectHash},#{windowStart},1)</insert>
+  <delete id="deleteOlderThan">DELETE FROM api_rate_limits WHERE window_start &lt; #{before}</delete>
+</mapper>

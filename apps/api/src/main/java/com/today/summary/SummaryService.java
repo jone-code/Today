@@ -3,6 +3,8 @@ package com.today.summary;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.today.aigateway.AiGatewayService;
 import com.today.aigateway.AiGatewayService.AiTask;
+import com.today.checkin.CheckinMapper;
+import com.today.checkin.StaleCheckinException;
 import com.today.common.EntityMapper;
 import com.today.common.JsonUtils;
 import com.today.common.Mood;
@@ -29,12 +31,14 @@ public class SummaryService {
       new TypeReference<>() {};
 
   private final SummaryMapper summaryMapper;
+  private final CheckinMapper checkins;
   private final AiGatewayService aiGateway;
   private final IdentityService identity;
 
   public SummaryService(
-      SummaryMapper summaryMapper, AiGatewayService aiGateway, IdentityService identity) {
+      SummaryMapper summaryMapper, CheckinMapper checkins, AiGatewayService aiGateway, IdentityService identity) {
     this.summaryMapper = summaryMapper;
+    this.checkins = checkins;
     this.aiGateway = aiGateway;
     this.identity = identity;
   }
@@ -55,6 +59,10 @@ public class SummaryService {
             () -> heuristicSummary(rawText));
 
     SummaryPayload payload = normalize(result.data());
+    var checkin = checkins.lockById(checkinId, userId);
+    if (checkin == null || !checkin.getRawText().equals(rawText)) {
+      throw new StaleCheckinException();
+    }
     Instant now = EntityMapper.now();
     LocalDate summaryDate = EntityMapper.parseDate(date);
 

@@ -3,6 +3,7 @@ package com.today.memory;
 import com.today.vector.VectorReindexResult;
 import com.today.vector.VectorReindexService;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,6 +29,9 @@ public class MemoryController {
       @RequestParam(name = "includeArchived", defaultValue = "false") boolean includeArchived) {
     return new MemoryListDto(memories.list(includeArchived));
   }
+
+  @GetMapping("/v1/memories/{id}/origins")
+  public List<MemoryOriginDto> origins(@PathVariable String id) { return memories.origins(id); }
 
   @PutMapping("/v1/memories/{id}")
   public MemoryDto update(@PathVariable String id, @Valid @RequestBody MemoryUpdateRequest body) {

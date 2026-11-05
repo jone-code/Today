@@ -1,14 +1,20 @@
 package com.today.checkin;
 
 import com.today.aigateway.AiProperties;
+import com.today.common.CreateIdempotencyService;
 import com.today.identity.IdentityService;
 import com.today.summary.DaySummaryDto;
 import com.today.summary.SummaryService;
 import jakarta.validation.Valid;
+import java.util.List;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 public class CheckinController {
@@ -19,6 +25,8 @@ public class CheckinController {
   private final CheckinAiJobService aiJobs;
   private final IdentityService identity;
   private final AiProperties aiProperties;
+  private final CheckinMemoryCandidateService memoryCandidates;
+  private final CreateIdempotencyService requests;
 
   public CheckinController(
       CheckinService checkins,
@@ -26,13 +34,17 @@ public class CheckinController {
       CheckinAiPipeline pipeline,
       CheckinAiJobService aiJobs,
       IdentityService identity,
-      AiProperties aiProperties) {
+      AiProperties aiProperties,
+      CheckinMemoryCandidateService memoryCandidates,
+      CreateIdempotencyService requests) {
     this.checkins = checkins;
     this.summaries = summaries;
     this.pipeline = pipeline;
     this.aiJobs = aiJobs;
     this.identity = identity;
     this.aiProperties = aiProperties;
+    this.memoryCandidates = memoryCandidates;
+    this.requests = requests;
   }
 
   @GetMapping("/v1/checkins/today")
@@ -43,8 +55,37 @@ public class CheckinController {
     return new CheckinTodayResponse(checkin, job);
   }
 
+  @GetMapping("/v1/checkins/{id}")
+  public CheckinDto byId(@PathVariable String id) { return checkins.getById(id); }
+
+  @GetMapping("/v1/checkins/{id}/memory-candidates")
+  public List<CheckinMemoryCandidateDto> memoryCandidates(@PathVariable String id) {
+    return memoryCandidates.list(id);
+  }
+
+  @PostMapping("/v1/checkins/memory-candidates/{id}/confirm")
+  public CheckinMemoryCandidateDto confirmMemoryCandidate(
+      @PathVariable String id, @RequestBody(required = false) CandidateConfirmInput input) {
+    if (input != null && input.text() == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "memory text is required");
+    }
+    return memoryCandidates.confirm(id, input == null ? null : input.text());
+  }
+
+  public record CandidateConfirmInput(String text) {}
+
+  @PostMapping("/v1/checkins/memory-candidates/{id}/reject")
+  public CheckinMemoryCandidateDto rejectMemoryCandidate(@PathVariable String id) {
+    return memoryCandidates.reject(id);
+  }
+
   @PostMapping("/v1/checkins")
-  public CheckinSubmitResult create(@Valid @RequestBody CheckinCreateInput input) {
+  public CheckinSubmitResult create(@Valid @RequestBody CheckinCreateInput input,
+      @RequestHeader(value = "Idempotency-Key", required = false) String key) {
+    return requests.create("checkin", key, input, CheckinSubmitResult.class, () -> createOnce(input));
+  }
+
+  private CheckinSubmitResult createOnce(CheckinCreateInput input) {
     CheckinDto checkin = checkins.upsert(input);
     String userId = identity.getCurrentUserId();
 

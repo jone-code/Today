@@ -32,7 +32,7 @@ public class QdrantVectorStore implements VectorStore {
     try {
       client.upsertPoints(records);
     } catch (Exception e) {
-      log.warn("qdrant upsert failed count={} reason={}", records.size(), e.toString());
+      log.warn("qdrant upsert failed count={} errorCode={}", records.size(), e.getClass().getSimpleName());
       throw e instanceof RuntimeException re ? re : new IllegalStateException(e);
     }
   }
@@ -42,7 +42,7 @@ public class QdrantVectorStore implements VectorStore {
     try {
       client.deletePoints(List.of(memoryId));
     } catch (Exception e) {
-      log.warn("qdrant delete failed id={} reason={}", memoryId, e.toString());
+      log.warn("qdrant delete failed id={} errorCode={}", memoryId, e.getClass().getSimpleName());
       throw e instanceof RuntimeException re ? re : new IllegalStateException(e);
     }
   }
@@ -52,7 +52,7 @@ public class QdrantVectorStore implements VectorStore {
     try {
       client.setArchived(memoryId, userId, archived);
     } catch (Exception e) {
-      log.warn("qdrant setArchived failed id={} reason={}", memoryId, e.toString());
+      log.warn("qdrant setArchived failed id={} errorCode={}", memoryId, e.getClass().getSimpleName());
       throw e instanceof RuntimeException re ? re : new IllegalStateException(e);
     }
   }
@@ -71,7 +71,7 @@ public class QdrantVectorStore implements VectorStore {
     try {
       exists = client.collectionExists();
     } catch (Exception e) {
-      return VectorHealth.unavailable("qdrant", "collection check failed: " + e.getMessage());
+      return VectorHealth.unavailable("qdrant", "collection check failed: " + e.getClass().getSimpleName());
     }
     Integer actual = exists ? client.collectionVectorSize() : null;
     long points = exists ? client.countPoints() : 0;

@@ -35,6 +35,15 @@ today:
   jwt:
     secret: ${TODAY_JWT_SECRET:today-dev-jwt-secret-change-me-please-32bytes}
     expire-hours: ${TODAY_JWT_EXPIRE_HOURS:168}
+  rate-limit:
+    register-per-hour: ${TODAY_RATE_REGISTER_PER_HOUR:60}
+    login-ip-per-five-minutes: ${TODAY_RATE_LOGIN_IP_PER_FIVE_MINUTES:100}
+    login-email-per-five-minutes: ${TODAY_RATE_LOGIN_EMAIL_PER_FIVE_MINUTES:10}
+    conversation-per-hour: ${TODAY_RATE_CONVERSATION_PER_HOUR:30}
+    conversation-per-day: ${TODAY_RATE_CONVERSATION_PER_DAY:120}
+    conversation-create-per-day: ${TODAY_RATE_CONVERSATION_CREATE_PER_DAY:60}
+    avatar-per-day: ${TODAY_RATE_AVATAR_PER_DAY:20}
+    feedback-per-day: ${TODAY_RATE_FEEDBACK_PER_DAY:5}
   ai:
     api-key: ${OPENAI_API_KEY:}
     base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}

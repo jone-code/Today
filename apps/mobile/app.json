@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Today",
+    "slug": "today-personal-agent",
+    "scheme": "today",
+    "version": "0.1.0",
+    "orientation": "default",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.comonon.today",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "选择照片作为个人助手形象"
+      }
+    },
+    "android": {
+      "package": "com.comonon.today",
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.VIBRATE"
+      ]
+    },
+    "plugins": [
+      "expo-secure-store",
+      ["expo-image-picker", {
+        "photosPermission": "选择照片作为个人助手形象",
+        "cameraPermission": false,
+        "microphonePermission": false
+      }]
+    ]
+  }
+}

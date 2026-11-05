@@ -29,11 +29,13 @@ public interface CheckinAiJobMapper {
 
   int markSucceeded(
       @Param("id") String id,
+      @Param("lockedAt") Instant lockedAt,
       @Param("status") String status,
       @Param("updatedAt") Instant updatedAt);
 
   int markFailed(
       @Param("id") String id,
+      @Param("lockedAt") Instant lockedAt,
       @Param("status") String status,
       @Param("attempts") int attempts,
       @Param("lastError") String lastError,
@@ -45,4 +47,8 @@ public interface CheckinAiJobMapper {
       @Param("status") String status,
       @Param("nextRunAt") Instant nextRunAt,
       @Param("updatedAt") Instant updatedAt);
+
+  int rescheduleStale(
+      @Param("id") String id, @Param("lockedAt") Instant lockedAt,
+      @Param("now") Instant now);
 }

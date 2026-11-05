@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.today.agent.ConversationMapper">
+  <resultMap id="ConversationMap" type="com.today.persistence.ConversationEntity">
+    <id property="id" column="id"/><result property="userId" column="user_id"/>
+    <result property="clientRequestId" column="client_request_id"/>
+    <result property="title" column="title"/><result property="status" column="status"/>
+    <result property="version" column="version"/><result property="createdAt" column="created_at"/>
+    <result property="updatedAt" column="updated_at"/><result property="deletedAt" column="deleted_at"/>
+  </resultMap>
+  <resultMap id="MessageMap" type="com.today.persistence.ConversationMessageEntity">
+    <id property="id" column="id"/><result property="conversationId" column="conversation_id"/>
+    <result property="userId" column="user_id"/><result property="role" column="role"/>
+    <result property="body" column="body"/><result property="clientMessageId" column="client_message_id"/>
+    <result property="replyToMessageId" column="reply_to_message_id"/>
+    <result property="status" column="status"/><result property="generationAttempt" column="generation_attempt"/>
+    <result property="createdAt" column="created_at"/>
+    <result property="deletedAt" column="deleted_at"/>
+  </resultMap>
+  <select id="findById" resultMap="ConversationMap">SELECT * FROM conversations WHERE id=#{id} AND user_id=#{userId} AND deleted_at IS NULL LIMIT 1</select>
+  <select id="findByClientRequestId" resultMap="ConversationMap">SELECT * FROM conversations WHERE user_id=#{userId} AND client_request_id=#{clientRequestId} LIMIT 1</select>
+  <select id="lockById" resultMap="ConversationMap">SELECT * FROM conversations WHERE id=#{id} AND user_id=#{userId} AND deleted_at IS NULL LIMIT 1 FOR UPDATE</select>
+  <select id="listByUserId" resultMap="ConversationMap">SELECT * FROM conversations WHERE user_id=#{userId} AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT #{limit}</select>
+  <insert id="insert">INSERT INTO conversations (id,user_id,client_request_id,title,status,version,created_at,updated_at,deleted_at) VALUES (#{id},#{userId},#{clientRequestId},#{title},#{status},#{version},#{createdAt},#{updatedAt},#{deletedAt})</insert>
+  <insert id="insertIdempotent">INSERT INTO conversations (id,user_id,client_request_id,title,status,version,created_at,updated_at,deleted_at) VALUES (#{id},#{userId},#{clientRequestId},#{title},#{status},#{version},#{createdAt},#{updatedAt},#{deletedAt}) ON DUPLICATE KEY UPDATE id=id</insert>
+  <update id="update">UPDATE conversations SET title=#{title}, status=#{status}, version=#{version}, updated_at=#{updatedAt} WHERE id=#{id} AND user_id=#{userId} AND deleted_at IS NULL</update>
+  <update id="softDelete">UPDATE conversations SET status='deleted', deleted_at=#{deletedAt}, updated_at=#{deletedAt}, version=version+1 WHERE id=#{id} AND user_id=#{userId} AND deleted_at IS NULL</update>
+  <update id="softDeleteMessages">UPDATE conversation_messages SET deleted_at=#{deletedAt} WHERE conversation_id=#{conversationId} AND user_id=#{userId} AND deleted_at IS NULL</update>
+  <select id="findMessageByClientId" resultMap="MessageMap">SELECT * FROM conversation_messages WHERE user_id=#{userId} AND client_message_id=#{clientMessageId} LIMIT 1</select>
+  <select id="findMessageById" resultMap="MessageMap">SELECT * FROM conversation_messages WHERE id=#{id} AND user_id=#{userId} AND conversation_id=#{conversationId} AND deleted_at IS NULL LIMIT 1</select>
+  <select id="findReply" resultMap="MessageMap">SELECT * FROM conversation_messages WHERE user_id=#{userId} AND reply_to_message_id=#{messageId} AND deleted_at IS NULL LIMIT 1</select>
+  <select id="findProcessing" resultMap="MessageMap">SELECT * FROM conversation_messages WHERE conversation_id=#{conversationId} AND user_id=#{userId} AND role='user' AND status='processing' AND deleted_at IS NULL LIMIT 1</select>
+  <select id="listMessageIds" resultType="string">SELECT id FROM conversation_messages WHERE conversation_id=#{conversationId} AND user_id=#{userId}</select>
+  <select id="listMessages" resultMap="MessageMap">SELECT * FROM conversation_messages WHERE conversation_id=#{conversationId} AND user_id=#{userId} AND deleted_at IS NULL ORDER BY created_at DESC, id DESC LIMIT #{limit}</select>
+  <select id="listMessagesBefore" resultMap="MessageMap">SELECT * FROM conversation_messages WHERE conversation_id=#{conversationId} AND user_id=#{userId} AND deleted_at IS NULL AND (created_at &lt; #{before} OR (created_at = #{before} AND id &lt; #{beforeId})) ORDER BY created_at DESC, id DESC LIMIT #{limit}</select>
+  <select id="listHistoryBefore" resultMap="MessageMap">SELECT * FROM conversation_messages WHERE conversation_id=#{conversationId} AND user_id=#{userId} AND deleted_at IS NULL AND created_at &lt; #{before} ORDER BY created_at DESC, id DESC LIMIT #{limit}</select>
+  <insert id="insertMessage">INSERT INTO conversation_messages (id,conversation_id,user_id,role,body,client_message_id,reply_to_message_id,status,generation_attempt,created_at,deleted_at) VALUES (#{id},#{conversationId},#{userId},#{role},#{body},#{clientMessageId},#{replyToMessageId},#{status},#{generationAttempt},#{createdAt},#{deletedAt})</insert>
+  <update id="updateMessageStatus">UPDATE conversation_messages SET status=#{status} WHERE id=#{id} AND user_id=#{userId} AND status='processing' AND generation_attempt=#{attempt} AND deleted_at IS NULL</update>
+  <update id="retryFailedMessage">UPDATE conversation_messages SET status='processing', generation_attempt=generation_attempt+1, generation_started_at=#{now} WHERE id=#{id} AND user_id=#{userId} AND status='failed' AND deleted_at IS NULL</update>
+  <update id="failStaleMessages">UPDATE conversation_messages SET status='failed' WHERE role='user' AND status='processing' AND deleted_at IS NULL AND COALESCE(generation_started_at, created_at) &lt; #{before}</update>
+</mapper>

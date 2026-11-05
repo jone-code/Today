@@ -8,9 +8,10 @@ import com.today.common.JsonUtils;
 import com.today.common.MemoryCategory;
 import com.today.identity.IdentityService;
 import com.today.persistence.MemoryEntity;
-import com.today.vector.MemoryVectorRecord;
+import com.today.persistence.MemorySourceEntity;
 import com.today.vector.ScoredMemoryId;
 import com.today.vector.VectorStore;
+import com.today.vector.VectorSyncJobMapper;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,16 +32,22 @@ public class MemoryService {
   private final AiGatewayService aiGateway;
   private final IdentityService identity;
   private final VectorStore vectorStore;
+  private final MemorySourceMapper sourceMapper;
+  private final VectorSyncJobMapper vectorJobs;
 
   public MemoryService(
       MemoryMapper memoryMapper,
       AiGatewayService aiGateway,
       IdentityService identity,
-      VectorStore vectorStore) {
+      VectorStore vectorStore,
+      MemorySourceMapper sourceMapper,
+      VectorSyncJobMapper vectorJobs) {
     this.memoryMapper = memoryMapper;
     this.aiGateway = aiGateway;
     this.identity = identity;
     this.vectorStore = vectorStore;
+    this.sourceMapper = sourceMapper;
+    this.vectorJobs = vectorJobs;
   }
 
   public List<MemoryDto> list(boolean includeArchived) {
@@ -53,14 +60,33 @@ public class MemoryService {
     return list(false);
   }
 
+  public List<MemoryOriginDto> origins(String id) {
+    MemoryEntity memory = requireOwned(id);
+    return sourceMapper.listDisplayableOrigins(memory.getId(), memory.getUserId()).stream()
+        .map(origin -> new MemoryOriginDto(
+            "checkin".equals(origin.getSourceType()) ? "checkin" : "conversation",
+            origin.getSourceId(),
+            origin.getCheckinDate() == null ? null : origin.getCheckinDate().toString(),
+            origin.getConversationId()))
+        .toList();
+  }
+
+  /** Legacy memories without a live, confirmed source are not injected into conversation prompts. */
+  public List<Map<String, String>> confirmedForConversation(int limit) {
+    return memoryMapper.listConfirmedForAgent(identity.getCurrentUserId(), Math.min(10, Math.max(1, limit)))
+        .stream()
+        .map(memory -> Map.of("category", memory.getCategory(), "text", memory.getMemoryText()))
+        .toList();
+  }
+
   /** 按 query 检索最相关记忆（默认排除已归档） */
   public List<MemoryDto> retrieveRelevant(String queryText, int topK) {
     String userId = identity.getCurrentUserId();
-    List<MemoryEntity> all = memoryMapper.listByUserId(userId, false);
-    if (all.isEmpty()) {
+    int limit = Math.max(1, topK);
+    List<MemoryEntity> confirmed = memoryMapper.listConfirmedForAgent(userId, limit);
+    if (confirmed.isEmpty()) {
       return List.of();
     }
-    int limit = Math.max(1, topK);
 
     Optional<List<float[]>> queryEmbed =
         aiGateway.embed(List.of(queryText == null ? "" : queryText));
@@ -70,8 +96,8 @@ public class MemoryService {
       if (hits != null && !hits.isEmpty()) {
         List<MemoryDto> out = new ArrayList<>();
         for (ScoredMemoryId hit : hits) {
-          MemoryEntity entity = memoryMapper.findById(hit.memoryId());
-          if (entity == null || entity.isArchived() || !userId.equals(entity.getUserId())) {
+          MemoryEntity entity = memoryMapper.findConfirmedById(hit.memoryId(), userId);
+          if (entity == null) {
             continue;
           }
           out.add(EntityMapper.toDto(entity));
@@ -82,7 +108,7 @@ public class MemoryService {
       }
     }
 
-    return all.stream().limit(limit).map(EntityMapper::toDto).toList();
+    return confirmed.stream().map(EntityMapper::toDto).toList();
   }
 
   @Transactional
@@ -110,8 +136,8 @@ public class MemoryService {
       backfillEmbeddings(List.of(entity), entity.getUpdatedAt());
     } else {
       memoryMapper.update(entity);
-      syncVectorIndex(entity);
     }
+    enqueueVectorSync(entity);
     return EntityMapper.toDto(requireOwned(id));
   }
 
@@ -121,7 +147,7 @@ public class MemoryService {
     entity.setArchived(archived);
     entity.setUpdatedAt(EntityMapper.now());
     memoryMapper.update(entity);
-    vectorStore.setArchived(entity.getId(), entity.getUserId(), archived);
+    enqueueVectorSync(entity);
     return EntityMapper.toDto(entity);
   }
 
@@ -129,16 +155,11 @@ public class MemoryService {
   public void delete(String id) {
     MemoryEntity entity = requireOwned(id);
     memoryMapper.deleteById(id, identity.getCurrentUserId());
-    vectorStore.delete(entity.getId());
+    enqueueVectorSync(entity);
   }
 
-  @Transactional
-  public List<MemoryDto> upsertFromCheckin(String rawText) {
-    return upsertFromCheckin(identity.getCurrentUserId(), rawText);
-  }
-
-  @Transactional
-  public List<MemoryDto> upsertFromCheckin(String userId, String rawText) {
+  /** Extracts suggestions only. A checkin must never write long-term memory without confirmation. */
+  public List<MemoryCandidate> extractCandidatesFromCheckin(String rawText) {
     var result =
         aiGateway.complete(
             AiTask.memory_extract,
@@ -146,52 +167,74 @@ public class MemoryService {
             EXTRACT_TYPE,
             () -> new MemoryExtractPayload(heuristicExtract(rawText)));
 
-    Instant now = EntityMapper.now();
-    List<MemoryCandidate> items =
-        result.data() == null || result.data().items() == null
+    return result.data() == null || result.data().items() == null
             ? List.of()
             : result.data().items().stream()
                 .filter(i -> i != null && i.text() != null && !i.text().isBlank())
                 .filter(i -> i.category() != null)
                 .limit(5)
                 .toList();
+  }
 
-    List<MemoryEntity> needEmbed = new ArrayList<>();
+  @Transactional
+  public MemoryDto confirmFromProposal(
+      String userId, MemoryCategory category, String text, String sourceType, String sourceId) {
+    String normalized = text == null ? "" : text.trim();
+    if (normalized.isBlank() || normalized.length() > 512) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "memory text is invalid");
+    }
+    // A conversation-derived memory has its own identity; legacy memories lack source records.
+    String id = java.util.UUID.randomUUID().toString();
+    Instant now = EntityMapper.now();
+    MemoryEntity entity = new MemoryEntity();
+    entity.setId(id);
+    entity.setUserId(userId);
+    entity.setCategory(category.name());
+    entity.setMemoryText(normalized);
+    entity.setStrength(1);
+    entity.setArchived(false);
+    entity.setUpdatedAt(now);
+    memoryMapper.insert(entity);
+    MemorySourceEntity source = new MemorySourceEntity();
+    source.setMemoryId(entity.getId());
+    source.setUserId(userId);
+    source.setSourceType(sourceType);
+    source.setSourceId(sourceId);
+    source.setActive(true);
+    source.setCreatedAt(now);
+    sourceMapper.insert(source);
+    backfillEmbeddings(List.of(entity), now);
+    enqueueVectorSync(entity);
+    return EntityMapper.toDto(memoryMapper.findById(entity.getId()));
+  }
 
-    for (MemoryCandidate item : items) {
-      String text = item.text().trim();
-      String id = userId + ":" + item.category().name() + ":" + text;
-      MemoryEntity existing = memoryMapper.findById(id);
-      if (existing == null) {
-        MemoryEntity created = new MemoryEntity();
-        created.setId(id);
-        created.setUserId(userId);
-        created.setCategory(item.category().name());
-        created.setMemoryText(text);
-        created.setStrength(1);
-        created.setArchived(false);
-        created.setUpdatedAt(now);
-        memoryMapper.insert(created);
-        needEmbed.add(created);
-      } else {
-        existing.setStrength(existing.getStrength() + 1);
-        existing.setArchived(false);
-        existing.setUpdatedAt(now);
-        if (existing.getEmbeddingJson() == null || existing.getEmbeddingJson().isBlank()) {
-          needEmbed.add(existing);
-        } else {
-          memoryMapper.update(existing);
-          syncVectorIndex(existing);
-        }
+  @Transactional
+  public void deactivateConversationSource(String userId, String messageId) {
+    deactivateSource(userId, "conversation_message", messageId);
+  }
+
+  @Transactional
+  public void deactivateCheckinSource(String userId, String checkinId) {
+    deactivateSource(userId, "checkin", checkinId);
+  }
+
+  private void deactivateSource(String userId, String sourceType, String sourceId) {
+    List<MemorySourceEntity> affected = sourceMapper.listBySource(userId, sourceType, sourceId);
+    sourceMapper.deactivateBySource(userId, sourceType, sourceId);
+    for (MemorySourceEntity source : affected) {
+      if (!sourceMapper.listByMemory(source.getMemoryId(), userId).isEmpty()) continue;
+      MemoryEntity memory = memoryMapper.findById(source.getMemoryId());
+      if (memory != null && userId.equals(memory.getUserId())) {
+        memory.setArchived(true);
+        memory.setUpdatedAt(EntityMapper.now());
+        memoryMapper.update(memory);
+        enqueueVectorSync(memory);
       }
     }
-
-    backfillEmbeddings(needEmbed, now);
-    return memoryMapper.listByUserId(userId, false).stream().map(EntityMapper::toDto).toList();
   }
 
   private MemoryEntity requireOwned(String id) {
-    MemoryEntity entity = memoryMapper.findById(id);
+    MemoryEntity entity = memoryMapper.findVisibleById(id, identity.getCurrentUserId());
     if (entity == null || !identity.getCurrentUserId().equals(entity.getUserId())) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "memory not found");
     }
@@ -211,56 +254,28 @@ public class MemoryService {
       return;
     }
     List<float[]> vecs = vectors.get();
-    List<MemoryVectorRecord> records = new ArrayList<>();
     for (int i = 0; i < entities.size(); i++) {
       MemoryEntity entity = entities.get(i);
       entity.setEmbeddingJson(JsonUtils.toJsonFloatArray(vecs.get(i)));
       entity.setUpdatedAt(now);
       memoryMapper.update(entity);
-      records.add(toRecord(entity, vecs.get(i)));
     }
-    vectorStore.upsertAll(records);
   }
 
-  private void syncVectorIndex(MemoryEntity entity) {
-    float[] vec = JsonUtils.fromJsonFloatArray(entity.getEmbeddingJson());
-    if (vec == null) {
-      vectorStore.setArchived(entity.getId(), entity.getUserId(), entity.isArchived());
-      return;
-    }
-    vectorStore.upsert(toRecord(entity, vec));
-  }
-
-  private static MemoryVectorRecord toRecord(MemoryEntity entity, float[] vector) {
-    return new MemoryVectorRecord(
-        entity.getId(),
-        entity.getUserId(),
-        entity.getCategory(),
-        entity.getMemoryText(),
-        entity.getStrength(),
-        entity.isArchived(),
-        vector);
+  private void enqueueVectorSync(MemoryEntity entity) {
+    vectorJobs.enqueue(entity.getId(), entity.getUserId(), EntityMapper.now());
   }
 
   private List<MemoryCandidate> heuristicExtract(String rawText) {
     List<MemoryCandidate> out = new ArrayList<>();
-    if (rawText.matches(".*(压力|加班|上线).*")) {
-      out.add(new MemoryCandidate(MemoryCategory.work, "最近工作压力偏高"));
-    }
-    if (rawText.matches(".*(运动|跑步|健身).*")) {
+    if (rawText.matches("(?s).*(每天|每周|长期|一直|坚持)[^。！？，,；;\\n]{0,20}(运动|跑步|健身).*")) {
       out.add(new MemoryCandidate(MemoryCategory.health, "正在坚持运动"));
     }
-    if (rawText.matches(".*(学习|AI|课程).*")) {
+    if (rawText.matches("(?s).*(每天|每周|长期|一直|持续|坚持)[^。！？，,；;\\n]{0,20}(学习|课程|学AI).*")) {
       out.add(new MemoryCandidate(MemoryCategory.learning, "正在持续学习"));
     }
-    if (rawText.matches(".*(创业|产品|Demo|MVP).*")) {
-      out.add(new MemoryCandidate(MemoryCategory.goal, "正在推进创业 / 产品"));
-    }
-    if (rawText.matches(".*面试.*")) {
-      out.add(new MemoryCandidate(MemoryCategory.goal, "近期有面试相关安排"));
-    }
-    if (rawText.matches(".*(累|疲惫).*")) {
-      out.add(new MemoryCandidate(MemoryCategory.emotion, "近期多次提到疲惫"));
+    if (rawText.matches("(?s).*(正在|计划|准备|打算)[^。！？，,；;\\n]{0,20}(创业|做产品|开发产品).*")) {
+      out.add(new MemoryCandidate(MemoryCategory.goal, "有创业或产品目标"));
     }
     return out;
   }

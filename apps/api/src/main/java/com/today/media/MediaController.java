@@ -1,6 +1,7 @@
 package com.today.media;
 
 import com.today.identity.IdentityService;
+import com.today.punch.PunchMapper;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.springframework.core.io.FileSystemResource;
@@ -17,10 +18,12 @@ public class MediaController {
 
   private final LocalMediaStorage storage;
   private final IdentityService identity;
+  private final PunchMapper punches;
 
-  public MediaController(LocalMediaStorage storage, IdentityService identity) {
+  public MediaController(LocalMediaStorage storage, IdentityService identity, PunchMapper punches) {
     this.storage = storage;
     this.identity = identity;
+    this.punches = punches;
   }
 
   @GetMapping("/v1/media/{*relativePath}")
@@ -29,7 +32,7 @@ public class MediaController {
     String path = stripLeadingSlash(relativePath);
     // Punch photos are stored under punch/{userId}/...
     String expectedPrefix = "punch/" + userId.replaceAll("[^a-zA-Z0-9_-]", "_") + "/";
-    if (!path.startsWith(expectedPrefix)) {
+    if (!path.startsWith(expectedPrefix) || !punches.isPhotoReferenced(path, userId)) {
       return ResponseEntity.notFound().build();
     }
     Path file = storage.resolveReadable(path);
@@ -44,7 +47,7 @@ public class MediaController {
             ? MediaType.parseMediaType(contentType)
             : MediaType.APPLICATION_OCTET_STREAM;
     return ResponseEntity.ok()
-        .header(HttpHeaders.CACHE_CONTROL, "private, max-age=3600")
+        .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
         .contentType(mediaType)
         .body(new FileSystemResource(file));
   }

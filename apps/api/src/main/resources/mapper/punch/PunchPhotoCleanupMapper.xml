@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.today.punch.PunchPhotoCleanupMapper">
+  <insert id="enqueue">
+    INSERT INTO punch_photo_cleanup_jobs (path, user_id, attempts, next_attempt_at)
+    VALUES (#{path}, #{userId}, 0, #{now})
+    ON DUPLICATE KEY UPDATE next_attempt_at = VALUES(next_attempt_at)
+  </insert>
+  <select id="ready" resultType="com.today.punch.PunchPhotoCleanupJob">
+    SELECT path, user_id AS userId, attempts, lease_until AS leaseUntil
+    FROM punch_photo_cleanup_jobs
+    WHERE next_attempt_at &lt;= #{now} AND (lease_until IS NULL OR lease_until &lt;= #{now})
+    ORDER BY next_attempt_at LIMIT #{limit}
+  </select>
+  <update id="claim">
+    UPDATE punch_photo_cleanup_jobs SET lease_until = #{leaseUntil}
+    WHERE path = #{path} AND next_attempt_at &lt;= #{now}
+      AND (lease_until IS NULL OR lease_until &lt;= #{now})
+  </update>
+  <delete id="complete">
+    DELETE FROM punch_photo_cleanup_jobs WHERE path = #{path} AND lease_until = #{leaseUntil}
+  </delete>
+  <update id="retry">
+    UPDATE punch_photo_cleanup_jobs SET attempts = attempts + 1,
+      next_attempt_at = #{nextAttemptAt}, lease_until = NULL
+    WHERE path = #{path} AND lease_until = #{leaseUntil}
+  </update>
+</mapper>

@@ -9,3 +9,5 @@ export * from "./identity";
 export * from "./reminder";
 export * from "./todo";
 export * from "./punch";
+export * from "./agent";
+export * from "./feedback";

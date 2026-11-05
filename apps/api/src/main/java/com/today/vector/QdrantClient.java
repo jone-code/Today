@@ -247,7 +247,7 @@ public class QdrantClient {
       }
       return size.canConvertToInt() ? size.asInt() : null;
     } catch (Exception e) {
-      log.warn("qdrant collection info failed reason={}", e.toString());
+      log.warn("qdrant collection info failed errorCode={}", e.getClass().getSimpleName());
       return null;
     }
   }
@@ -271,7 +271,7 @@ public class QdrantClient {
       if (response == null) return 0;
       return response.path("result").path("count").asLong(0);
     } catch (Exception e) {
-      log.warn("qdrant count failed reason={}", e.toString());
+      log.warn("qdrant count failed errorCode={}", e.getClass().getSimpleName());
       return 0;
     }
   }

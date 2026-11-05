@@ -12,6 +12,8 @@ public interface ReminderMapper {
 
   ReminderEntity findById(@Param("id") String id);
 
+  ReminderEntity lockOwned(@Param("id") String id, @Param("userId") String userId);
+
   List<ReminderEntity> listByUserId(@Param("userId") String userId);
 
   List<ReminderEntity> listEnabled();

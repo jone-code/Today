@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * API smoke: register → login → checkin → wait summary → memories
+ * API smoke: register → login → checkin → candidate → confirm → memory
  *
  * Env:
  *   API_BASE_URL (default http://127.0.0.1:3001)
@@ -65,23 +65,27 @@ async function waitForSummary(token, date, attempts = 40, intervalMs = 500) {
   throw lastErr || new Error("summary not ready");
 }
 
-async function waitForMemories(token, attempts = 40, intervalMs = 500) {
-  let last = [];
+async function waitForCandidates(token, checkinId, attempts = 40, intervalMs = 500) {
   for (let i = 1; i <= attempts; i++) {
-    const memories = await request("/v1/memories", { token });
-    last = memories.items || [];
-    if (last.length >= 1) return last;
+    const candidates = await request(
+      `/v1/checkins/${encodeURIComponent(checkinId)}/memory-candidates`,
+      { token },
+    );
+    if (candidates.some((candidate) => candidate.status === "pending")) {
+      return candidates;
+    }
     await new Promise((r) => setTimeout(r, intervalMs));
   }
-  throw new Error(
-    `expected at least one memory after checkin (got ${last.length})`,
-  );
+  throw new Error("expected at least one pending memory candidate after checkin");
 }
 
 async function main() {
   console.log(`API smoke against ${API_BASE}`);
 
   const health = await request("/health");
+  if (health?.service !== "today-api") {
+    throw new Error(`unexpected service at ${API_BASE}: ${JSON.stringify(health)}`);
+  }
   log("health", typeof health === "object" ? JSON.stringify(health) : String(health));
 
   let token;
@@ -116,7 +120,7 @@ async function main() {
   log("login");
 
   const rawText =
-    "今天跑步锻炼了，还学了点 AI，工作压力有点大但整体还好。";
+    "我每周坚持跑步，今天也跑步锻炼了，还学了点 AI，工作压力有点大但整体还好。";
   const checkin = await request("/v1/checkins", {
     method: "POST",
     token,
@@ -125,6 +129,11 @@ async function main() {
   const date = checkin.checkin?.date || checkin.date;
   const status = checkin.status || "ready";
   log("checkin", `${date} status=${status}`);
+  const checkinById = await request(`/v1/checkins/${encodeURIComponent(checkin.checkin.id)}`, { token });
+  if (checkinById.rawText !== rawText || checkinById.id !== checkin.checkin.id) {
+    throw new Error("checkin detail did not return the original text");
+  }
+  log("checkin detail");
 
   const summary =
     checkin.summary || (await waitForSummary(token, date));
@@ -133,12 +142,44 @@ async function main() {
   }
   log("summary", summary.oneLiner);
 
-  // memory upsert runs after summary in the async pipeline
-  const items = await waitForMemories(token);
-  log("memories", `${items.length} item(s); first=${items[0].text}`);
+  const beforeConfirm = await request("/v1/memories", { token });
+  if ((beforeConfirm.items || []).length !== 0) {
+    throw new Error("checkin wrote long-term memory before user confirmation");
+  }
+  const candidates = await waitForCandidates(token, checkin.checkin.id);
+  const candidate = candidates.find((item) => item.status === "pending");
+  const correctedText = "我每周跑步，正在坚持这项习惯。";
+  const confirmed = await request(
+    `/v1/checkins/memory-candidates/${encodeURIComponent(candidate.id)}/confirm`,
+    { method: "POST", token, body: { text: correctedText } },
+  );
+  if (confirmed.text !== correctedText) throw new Error("confirmed candidate did not retain corrected text");
+  const afterConfirm = await request("/v1/memories", { token });
+  const items = afterConfirm.items || [];
+  if (!items.some((item) => item.text === correctedText) || items.some((item) => item.text === candidate.text)) {
+    throw new Error("memory must contain only the corrected candidate text");
+  }
+  log("memory confirmation", correctedText);
 
   // manage path briefly
   const first = items[0];
+  const originsPath = `/v1/memories/${encodeURIComponent(first.id)}/origins`;
+  const origins = await request(originsPath, { token });
+  if (!origins.some((origin) => origin.kind === "checkin"
+    && origin.sourceId === checkin.checkin.id && origin.date === date)) {
+    throw new Error("confirmed memory is missing its active checkin origin");
+  }
+  if (origins.some((origin) => "rawText" in origin)) {
+    throw new Error("memory origin response exposed original text");
+  }
+  const other = await request("/v1/auth/register", {
+    method: "POST", body: { email: `e2e.other.${stamp}@example.com`, password, displayName: "Other" },
+  });
+  for (const path of [originsPath, `/v1/checkins/${encodeURIComponent(checkin.checkin.id)}`]) {
+    const response = await fetch(`${API_BASE}${path}`, { headers: { authorization: `Bearer ${other.token}` } });
+    if (response.status !== 404) throw new Error(`another user accessed ${path}: ${response.status}`);
+  }
+  log("memory origin and checkin ownership");
   const archived = await request(`/v1/memories/${encodeURIComponent(first.id)}/archive`, {
     method: "POST",
     token,
@@ -154,9 +195,34 @@ async function main() {
   });
   log("memory archive/unarchive");
 
+  await request("/v1/checkins", {
+    method: "POST", token, body: { date, rawText: "今天的记录已更正，不再包含此前的内容。" },
+  });
+  const correctedMemories = await request("/v1/memories?includeArchived=true", { token });
+  if (correctedMemories.items?.some((memory) => memory.id === first.id)) {
+    throw new Error("memory derived from an older checkin revision remains visible");
+  }
+  const correctedOrigins = await request(originsPath, { token }).catch((error) => {
+    if (String(error.message).includes("404")) return [];
+    throw error;
+  });
+  if (correctedOrigins.length) throw new Error("invalidated memory still exposes an old source");
+  log("checkin correction revokes its old memory source");
+
+  const yesterday = new Date(Date.parse(`${date}T00:00:00Z`) - 86400000)
+    .toISOString().slice(0, 10);
+  await request("/v1/checkins", {
+    method: "POST", token, body: { date: yesterday, rawText: "昨天参加了面试，想明天看看结果。" },
+  });
+  const opening = await request("/v1/proactive/today", { token });
+  if (opening.prompts?.some((prompt) => prompt.source === "followup")) {
+    throw new Error("legacy daily prompt bypassed Agent followup authorization");
+  }
+  log("legacy daily opening cannot create unconsented followups");
+
   console.log("\nAPI smoke passed.");
   console.log(
-    JSON.stringify({ email, password, displayName, date, memoryCount: items.length }),
+    JSON.stringify({ email, date, memoryCount: items.length }),
   );
 }
 

@@ -80,7 +80,7 @@
         last_error = NULL,
         locked_at = NULL,
         updated_at = #{updatedAt}
-    WHERE id = #{id}
+    WHERE id = #{id} AND status = 'running' AND locked_at = #{lockedAt}
   </update>
 
   <update id="markFailed">
@@ -91,7 +91,7 @@
         next_run_at = #{nextRunAt},
         locked_at = NULL,
         updated_at = #{updatedAt}
-    WHERE id = #{id}
+    WHERE id = #{id} AND status = 'running' AND locked_at = #{lockedAt}
   </update>
 
   <update id="resetForRetry">
@@ -103,5 +103,12 @@
         locked_at = NULL,
         updated_at = #{updatedAt}
     WHERE id = #{id}
+  </update>
+
+  <update id="rescheduleStale">
+    UPDATE checkin_ai_jobs
+    SET status = 'pending', attempts = 0, last_error = NULL,
+        next_run_at = #{now}, locked_at = NULL, updated_at = #{now}
+    WHERE id = #{id} AND status = 'running' AND locked_at = #{lockedAt}
   </update>
 </mapper>

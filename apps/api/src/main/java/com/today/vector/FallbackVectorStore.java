@@ -29,7 +29,7 @@ public class FallbackVectorStore implements VectorStore {
     try {
       primary.upsert(record);
     } catch (Exception e) {
-      log.warn("vector upsert primary failed, continuing reason={}", e.toString());
+      log.warn("vector upsert primary failed, continuing errorCode={}", e.getClass().getSimpleName());
     }
   }
 
@@ -38,7 +38,7 @@ public class FallbackVectorStore implements VectorStore {
     try {
       primary.upsertAll(records);
     } catch (Exception e) {
-      log.warn("vector upsertAll primary failed, continuing reason={}", e.toString());
+      log.warn("vector upsertAll primary failed, continuing errorCode={}", e.getClass().getSimpleName());
     }
   }
 
@@ -47,7 +47,7 @@ public class FallbackVectorStore implements VectorStore {
     try {
       primary.delete(memoryId);
     } catch (Exception e) {
-      log.warn("vector delete primary failed id={} reason={}", memoryId, e.toString());
+      log.warn("vector delete primary failed id={} errorCode={}", memoryId, e.getClass().getSimpleName());
     }
   }
 
@@ -56,7 +56,7 @@ public class FallbackVectorStore implements VectorStore {
     try {
       primary.setArchived(memoryId, userId, archived);
     } catch (Exception e) {
-      log.warn("vector setArchived primary failed id={} reason={}", memoryId, e.toString());
+      log.warn("vector setArchived primary failed id={} errorCode={}", memoryId, e.getClass().getSimpleName());
     }
   }
 
@@ -68,7 +68,7 @@ public class FallbackVectorStore implements VectorStore {
         return hits;
       }
     } catch (Exception e) {
-      log.warn("vector search primary failed, fallback reason={}", e.toString());
+      log.warn("vector search primary failed, fallback errorCode={}", e.getClass().getSimpleName());
     }
     return fallback.search(userId, query, topK);
   }
@@ -102,7 +102,7 @@ public class FallbackVectorStore implements VectorStore {
     try {
       return primary.recreateIndex();
     } catch (Exception e) {
-      log.warn("vector recreateIndex primary failed reason={}", e.toString());
+      log.warn("vector recreateIndex primary failed errorCode={}", e.getClass().getSimpleName());
       return false;
     }
   }

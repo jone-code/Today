@@ -12,4 +12,6 @@ public interface SummaryMapper {
       @Param("userId") String userId, @Param("summaryDate") LocalDate summaryDate);
 
   int upsert(DaySummaryEntity entity);
+
+  int deleteByCheckinId(@Param("checkinId") String checkinId, @Param("userId") String userId);
 }

@@ -20,11 +20,24 @@
     LIMIT 1
   </select>
 
+  <select id="lockByUserIdAndDate" resultMap="CheckinEntityMap">
+    SELECT * FROM checkins WHERE user_id=#{userId} AND checkin_date=#{checkinDate} LIMIT 1 FOR UPDATE
+  </select>
+
   <select id="findById" resultMap="CheckinEntityMap">
     SELECT id, user_id, checkin_date, raw_text, created_at, updated_at
     FROM checkins
     WHERE id = #{id}
     LIMIT 1
+  </select>
+
+  <select id="findOwnedById" resultMap="CheckinEntityMap">
+    SELECT id, user_id, checkin_date, raw_text, created_at, updated_at
+    FROM checkins WHERE id=#{id} AND user_id=#{userId} LIMIT 1
+  </select>
+
+  <select id="lockById" resultMap="CheckinEntityMap">
+    SELECT * FROM checkins WHERE id=#{id} AND user_id=#{userId} LIMIT 1 FOR UPDATE
   </select>
 
   <select id="listRecentByUserId" resultMap="CheckinEntityMap">

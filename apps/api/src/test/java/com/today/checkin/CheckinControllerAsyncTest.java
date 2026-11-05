@@ -6,8 +6,12 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 
 import com.today.aigateway.AiProperties;
+import com.today.common.CreateIdempotencyService;
 import com.today.common.AiProvider;
 import com.today.common.Mood;
 import com.today.identity.IdentityService;
@@ -29,6 +33,7 @@ class CheckinControllerAsyncTest {
   @Mock CheckinAiJobService aiJobs;
   @Mock IdentityService identity;
   @Mock AiProperties aiProperties;
+  @Mock CreateIdempotencyService requests;
 
   @InjectMocks CheckinController controller;
 
@@ -43,11 +48,14 @@ class CheckinControllerAsyncTest {
     when(aiProperties.isAsyncCheckin()).thenReturn(true);
     when(aiJobs.enqueueAndKick("u1", "c1", "2026-07-23", "今天很忙")).thenReturn(job);
 
-    CheckinSubmitResult result = controller.create(new CheckinCreateInput("今天很忙", null));
+    passThroughRequest();
+    CheckinSubmitResult result = controller.create(new CheckinCreateInput("今天很忙", null), "request-1");
 
     assertEquals(CheckinSubmitResult.STATUS_PROCESSING, result.status());
     assertEquals(null, result.summary());
     assertEquals("j1", result.aiJob().id());
+    verify(requests).create(eq("checkin"), eq("request-1"),
+        any(CheckinCreateInput.class), eq(CheckinSubmitResult.class), any());
     verify(pipeline, never())
         .processAfterCheckinSync(anyString(), anyString(), anyString(), anyString());
   }
@@ -73,12 +81,19 @@ class CheckinControllerAsyncTest {
     when(aiProperties.isAsyncCheckin()).thenReturn(false);
     when(summaries.getByDate("2026-07-23")).thenReturn(summary);
 
-    CheckinSubmitResult result = controller.create(new CheckinCreateInput("今天很忙", null));
+    passThroughRequest();
+    CheckinSubmitResult result = controller.create(new CheckinCreateInput("今天很忙", null), "request-1");
 
     assertEquals(CheckinSubmitResult.STATUS_READY, result.status());
     assertEquals(summary, result.summary());
     verify(pipeline).processAfterCheckinSync("u1", "c1", "2026-07-23", "今天很忙");
     verify(aiJobs, never())
         .enqueueAndKick(eq("u1"), anyString(), anyString(), anyString());
+  }
+
+  private void passThroughRequest() {
+    doAnswer(invocation -> ((java.util.function.Supplier<?>) invocation.getArgument(4)).get())
+        .when(requests).create(eq("checkin"), eq("request-1"), any(CheckinCreateInput.class),
+            eq(CheckinSubmitResult.class), any());
   }
 }

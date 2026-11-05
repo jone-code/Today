@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.today.memory.MemorySourceMapper">
+  <resultMap id="SourceMap" type="com.today.persistence.MemorySourceEntity">
+    <id property="memoryId" column="memory_id"/><result property="userId" column="user_id"/>
+    <result property="sourceType" column="source_type"/><result property="sourceId" column="source_id"/>
+    <result property="active" column="active"/><result property="createdAt" column="created_at"/>
+  </resultMap>
+  <resultMap id="OriginMap" type="com.today.memory.MemoryOrigin">
+    <result property="sourceType" column="source_type"/>
+    <result property="sourceId" column="source_id"/>
+    <result property="checkinDate" column="checkin_date"/>
+    <result property="conversationId" column="conversation_id"/>
+  </resultMap>
+  <insert id="insert">INSERT INTO memory_sources (memory_id,user_id,source_type,source_id,active,created_at) VALUES (#{memoryId},#{userId},#{sourceType},#{sourceId},#{active},#{createdAt}) ON DUPLICATE KEY UPDATE active=VALUES(active)</insert>
+  <select id="listByMemory" resultMap="SourceMap">SELECT * FROM memory_sources WHERE memory_id=#{memoryId} AND user_id=#{userId} AND active=1</select>
+  <select id="listDisplayableOrigins" resultMap="OriginMap">
+    SELECT s.source_type, s.source_id, c.checkin_date, m.conversation_id
+    FROM memory_sources s
+    LEFT JOIN checkins c ON s.source_type='checkin' AND c.id=s.source_id AND c.user_id=s.user_id
+    LEFT JOIN conversation_messages m ON s.source_type='conversation_message'
+      AND m.id=s.source_id AND m.user_id=s.user_id AND m.deleted_at IS NULL
+    LEFT JOIN conversations v ON v.id=m.conversation_id AND v.user_id=s.user_id AND v.deleted_at IS NULL
+    WHERE s.memory_id=#{memoryId} AND s.user_id=#{userId} AND s.active=1
+      AND ((s.source_type='checkin' AND c.id IS NOT NULL)
+        OR (s.source_type='conversation_message' AND v.id IS NOT NULL))
+    ORDER BY s.created_at DESC
+  </select>
+  <select id="listBySource" resultMap="SourceMap">SELECT * FROM memory_sources WHERE user_id=#{userId} AND source_type=#{sourceType} AND source_id=#{sourceId} AND active=1</select>
+  <update id="deactivateBySource">UPDATE memory_sources SET active=0 WHERE user_id=#{userId} AND source_type=#{sourceType} AND source_id=#{sourceId} AND active=1</update>
+</mapper>

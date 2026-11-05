@@ -72,6 +72,16 @@ CREATE TABLE IF NOT EXISTS reminders (
   KEY idx_reminders_user_enabled (user_id, enabled)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS create_requests (
+  user_id VARCHAR(64) NOT NULL,
+  scope VARCHAR(32) NOT NULL,
+  request_id VARCHAR(128) COLLATE utf8mb4_bin NOT NULL,
+  request_hash CHAR(64) NOT NULL,
+  response_json TEXT NULL,
+  created_at DATETIME(3) NOT NULL,
+  UNIQUE KEY uk_create_request (user_id, scope, request_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS reminder_deliveries (
   id VARCHAR(36) NOT NULL,
   reminder_id VARCHAR(36) NOT NULL,
@@ -124,7 +134,8 @@ CREATE TABLE IF NOT EXISTS punch_logs (
   created_at DATETIME(3) NOT NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uk_punch_habit_date (habit_id, punch_date),
-  KEY idx_punch_logs_user_date (user_id, punch_date DESC)
+  KEY idx_punch_logs_user_date (user_id, punch_date DESC),
+  KEY idx_punch_logs_user_photo (user_id, photo_path(191))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS proactive_prompt_events (
@@ -177,4 +188,48 @@ CREATE TABLE IF NOT EXISTS ai_call_logs (
   PRIMARY KEY (id),
   KEY idx_ai_call_logs_created (created_at DESC),
   KEY idx_ai_call_logs_task_outcome (task, outcome, created_at DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS vector_sync_jobs (
+  memory_id VARCHAR(128) NOT NULL,
+  user_id VARCHAR(64) NOT NULL,
+  version BIGINT NOT NULL DEFAULT 1,
+  state VARCHAR(16) NOT NULL DEFAULT 'pending',
+  attempts INT NOT NULL DEFAULT 0,
+  next_attempt_at DATETIME(3) NOT NULL,
+  lease_until DATETIME(3) NULL,
+  last_error_code VARCHAR(80) NULL,
+  updated_at DATETIME(3) NOT NULL,
+  PRIMARY KEY (memory_id),
+  KEY idx_vector_sync_due (state, next_attempt_at, lease_until)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS api_rate_limits (
+  scope VARCHAR(32) NOT NULL,
+  subject_hash CHAR(64) NOT NULL,
+  window_start DATETIME(3) NOT NULL,
+  hit_count INT NOT NULL,
+  PRIMARY KEY (scope, subject_hash, window_start),
+  KEY idx_rate_limits_window (window_start)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS punch_photo_cleanup_jobs (
+  path VARCHAR(512) NOT NULL,
+  user_id VARCHAR(64) NOT NULL,
+  attempts INT NOT NULL DEFAULT 0,
+  next_attempt_at DATETIME(3) NOT NULL,
+  lease_until DATETIME(3) NULL,
+  PRIMARY KEY (path),
+  KEY idx_punch_photo_cleanup_due (next_attempt_at, lease_until)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS feedback_reports (
+  id VARCHAR(36) NOT NULL,
+  user_id VARCHAR(64) NOT NULL,
+  kind VARCHAR(16) NOT NULL,
+  body VARCHAR(1000) NOT NULL,
+  created_at DATETIME(3) NOT NULL,
+  deleted_at DATETIME(3) NULL,
+  PRIMARY KEY (id),
+  KEY idx_feedback_owner (user_id, deleted_at, created_at, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -14,6 +14,17 @@
     <result property="updatedAt" column="updated_at"/>
   </resultMap>
 
+  <sql id="LiveSource">
+    EXISTS (SELECT 1 FROM memory_sources s
+      LEFT JOIN checkins c ON s.source_type='checkin' AND c.id=s.source_id AND c.user_id=s.user_id
+      LEFT JOIN conversation_messages cm ON s.source_type='conversation_message'
+        AND cm.id=s.source_id AND cm.user_id=s.user_id AND cm.deleted_at IS NULL
+      LEFT JOIN conversations cv ON cv.id=cm.conversation_id AND cv.user_id=s.user_id AND cv.deleted_at IS NULL
+      WHERE s.memory_id=m.id AND s.user_id=m.user_id AND s.active=1
+        AND ((s.source_type='checkin' AND c.id IS NOT NULL)
+          OR (s.source_type='conversation_message' AND cv.id IS NOT NULL)))
+  </sql>
+
   <select id="findById" resultMap="MemoryEntityMap">
     SELECT id, user_id, category, memory_text, strength, archived, embedding_json, updated_at
     FROM memories
@@ -21,14 +32,42 @@
     LIMIT 1
   </select>
 
+  <select id="findVisibleById" resultMap="MemoryEntityMap">
+    SELECT m.id, m.user_id, m.category, m.memory_text, m.strength, m.archived, m.embedding_json, m.updated_at
+    FROM memories m
+    WHERE m.id = #{id} AND m.user_id = #{userId}
+      AND (NOT EXISTS (SELECT 1 FROM memory_sources s WHERE s.memory_id=m.id)
+        OR <include refid="LiveSource"/>)
+    LIMIT 1
+  </select>
+
   <select id="listByUserId" resultMap="MemoryEntityMap">
-    SELECT id, user_id, category, memory_text, strength, archived, embedding_json, updated_at
-    FROM memories
-    WHERE user_id = #{userId}
+    SELECT m.id, m.user_id, m.category, m.memory_text, m.strength, m.archived, m.embedding_json, m.updated_at
+    FROM memories m
+    WHERE m.user_id = #{userId}
     <if test="!includeArchived">
-      AND archived = 0
+      AND m.archived = 0
     </if>
-    ORDER BY archived ASC, strength DESC, updated_at DESC
+      AND (NOT EXISTS (SELECT 1 FROM memory_sources s WHERE s.memory_id=m.id)
+        OR <include refid="LiveSource"/>)
+    ORDER BY m.archived ASC, m.strength DESC, m.updated_at DESC
+  </select>
+
+  <select id="listConfirmedForAgent" resultMap="MemoryEntityMap">
+    SELECT m.id, m.user_id, m.category, m.memory_text, m.strength, m.archived, m.embedding_json, m.updated_at
+    FROM memories m
+    WHERE m.user_id = #{userId} AND m.archived = 0
+      AND <include refid="LiveSource"/>
+    ORDER BY m.strength DESC, m.updated_at DESC
+    LIMIT #{limit}
+  </select>
+
+  <select id="findConfirmedById" resultMap="MemoryEntityMap">
+    SELECT m.id, m.user_id, m.category, m.memory_text, m.strength, m.archived, m.embedding_json, m.updated_at
+    FROM memories m
+    WHERE m.id = #{id} AND m.user_id = #{userId} AND m.archived = 0
+      AND <include refid="LiveSource"/>
+    LIMIT 1
   </select>
 
   <insert id="insert">
@@ -48,6 +87,14 @@
         embedding_json = #{embeddingJson},
         updated_at = #{updatedAt}
     WHERE id = #{id}
+  </update>
+
+  <update id="updateEmbeddingIfConfirmed">
+    UPDATE memories m SET m.embedding_json=#{embeddingJson}, m.updated_at=#{updatedAt}
+    WHERE m.id=#{id} AND m.user_id=#{userId} AND m.archived=0
+      AND m.memory_text=#{expectedText} AND m.updated_at=#{expectedUpdatedAt}
+      AND (m.embedding_json IS NULL OR m.embedding_json='')
+      AND <include refid="LiveSource"/>
   </update>
 
   <delete id="deleteById">

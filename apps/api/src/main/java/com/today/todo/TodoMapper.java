@@ -10,6 +10,10 @@ public interface TodoMapper {
 
   TodoEntity findById(@Param("id") String id);
 
+  TodoEntity lockByIdAndUser(@Param("id") String id, @Param("userId") String userId);
+
+  List<TodoEntity> listForAgent(@Param("userId") String userId, @Param("limit") int limit);
+
   List<TodoEntity> listByUserId(
       @Param("userId") String userId, @Param("status") String status);
 

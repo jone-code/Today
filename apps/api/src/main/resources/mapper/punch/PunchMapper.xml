@@ -30,6 +30,11 @@
     LIMIT 1
   </select>
 
+  <select id="lockHabitById" resultMap="HabitMap">
+    SELECT id, user_id, title, description, enabled, created_at, updated_at
+    FROM punch_habits WHERE id = #{id} AND user_id = #{userId} FOR UPDATE
+  </select>
+
   <select id="listHabitsByUserId" resultMap="HabitMap">
     SELECT id, user_id, title, description, enabled, created_at, updated_at
     FROM punch_habits
@@ -69,6 +74,12 @@
     LIMIT 1
   </select>
 
+  <select id="lockLog" resultMap="LogMap">
+    SELECT id, habit_id, user_id, punch_date, note, photo_path, created_at
+    FROM punch_logs WHERE habit_id = #{habitId} AND user_id = #{userId}
+      AND punch_date = #{punchDate} FOR UPDATE
+  </select>
+
   <select id="listLogsByHabit" resultMap="LogMap">
     SELECT id, habit_id, user_id, punch_date, note, photo_path, created_at
     FROM punch_logs
@@ -76,6 +87,19 @@
     ORDER BY punch_date DESC
     LIMIT #{limit}
   </select>
+
+  <select id="listAllLogsByHabit" resultMap="LogMap">
+    SELECT id, habit_id, user_id, punch_date, note, photo_path, created_at
+    FROM punch_logs WHERE habit_id = #{habitId} AND user_id = #{userId}
+  </select>
+
+  <select id="isPhotoReferenced" resultType="boolean">
+    SELECT EXISTS(SELECT 1 FROM punch_logs WHERE photo_path = #{path} AND user_id = #{userId})
+  </select>
+
+  <delete id="deleteLogsByHabit">
+    DELETE FROM punch_logs WHERE habit_id = #{habitId} AND user_id = #{userId}
+  </delete>
 
   <select id="listLogsByUserAndDate" resultMap="LogMap">
     SELECT id, habit_id, user_id, punch_date, note, photo_path, created_at

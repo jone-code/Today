@@ -45,4 +45,7 @@
       provider = VALUES(provider),
       created_at = VALUES(created_at)
   </insert>
+  <delete id="deleteByCheckinId">
+    DELETE FROM day_summaries WHERE checkin_id = #{checkinId} AND user_id = #{userId}
+  </delete>
 </mapper>

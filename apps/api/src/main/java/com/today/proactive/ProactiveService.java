@@ -5,6 +5,7 @@ import com.today.aigateway.AiGatewayService;
 import com.today.aigateway.AiGatewayService.AiTask;
 import com.today.checkin.CheckinDto;
 import com.today.checkin.CheckinService;
+import com.today.checkin.StaleCheckinException;
 import com.today.common.EntityMapper;
 import com.today.common.PromptSource;
 import com.today.identity.IdentityService;
@@ -68,7 +69,6 @@ public class ProactiveService {
 
     markAnsweredFromHistory(userId, recent);
 
-    List<FollowupCandidate> candidates = buildFollowupCandidates(today, recent);
     Set<String> suppressed = suppressedFingerprints(userId, today);
 
     String query = buildRetrievalQuery(date, recent);
@@ -78,7 +78,6 @@ public class ProactiveService {
     input.put("date", date);
     input.put("recent", recentForPrompt);
     input.put("memories", retrieved);
-    input.put("followupCandidates", candidates);
     input.put("suppressFingerprints", List.copyOf(suppressed));
 
     var result =
@@ -88,7 +87,7 @@ public class ProactiveService {
             PROACTIVE_TYPE,
             () ->
                 new ProactivePayload(
-                    heuristicPrompts(date, recent, retrieved, candidates, suppressed)));
+                    heuristicPrompts(date, recent, retrieved, suppressed)));
 
     List<ProactivePromptDto> prompts =
         result.data() == null || result.data().prompts() == null
@@ -99,10 +98,13 @@ public class ProactiveService {
                 .toList();
 
     if (prompts.isEmpty()) {
-      prompts = heuristicPrompts(date, recent, retrieved, candidates, suppressed);
+      prompts = heuristicPrompts(date, recent, retrieved, suppressed);
     }
 
-    prompts = finalizePrompts(prompts, suppressed, candidates);
+    prompts = finalizePrompts(prompts, suppressed);
+    if (prompts.isEmpty()) {
+      prompts = finalizePrompts(heuristicPrompts(date, recent, retrieved, suppressed), suppressed);
+    }
     persistShown(userId, today, prompts);
 
     return new ProactiveTodayDto(date, prompts, result.provider());
@@ -120,10 +122,12 @@ public class ProactiveService {
 
   /** checkin 写入后：用正文覆盖仍开放的追问 */
   @Transactional
-  public void markAnsweredFromCheckin(String userId, String checkinDate, String rawText) {
+  public void markAnsweredFromCheckin(String userId, String checkinId, String checkinDate, String rawText) {
     if (rawText == null || rawText.isBlank()) {
       return;
     }
+    CheckinDto current = checkins.lockByIdForPipeline(checkinId, userId);
+    if (current == null || !rawText.equals(current.rawText())) throw new StaleCheckinException();
     Instant now = EntityMapper.now();
     for (ProactivePromptEventEntity open : events.listOpenFollowups(userId)) {
       if (coversFollowup(open, checkinDate, rawText)) {
@@ -215,44 +219,6 @@ public class ProactiveService {
     return out;
   }
 
-  private List<FollowupCandidate> buildFollowupCandidates(
-      LocalDate today, List<CheckinDto> recent) {
-    Map<String, FollowupCandidate> byFp = new LinkedHashMap<>();
-    for (CheckinDto c : recent) {
-      LocalDate d = LocalDate.parse(c.date());
-      String text = c.rawText() == null ? "" : c.rawText();
-      if (text.matches(".*面试.*")) {
-        LocalDate due = d.plusDays(1);
-        if (!due.isAfter(today) && !due.isBefore(today.minusDays(2))) {
-          String fp = PromptFingerprints.ofFollowupTopic("interview", d.toString());
-          byFp.putIfAbsent(
-              fp,
-              new FollowupCandidate(
-                  fp,
-                  "followup-interview",
-                  "之前提到面试，结果怎么样？",
-                  d.toString(),
-                  "interview"));
-        }
-      }
-      if (text.matches(".*(明天|准备).*") && !text.matches(".*面试.*")) {
-        LocalDate due = d.plusDays(1);
-        if (due.equals(today)) {
-          String fp = PromptFingerprints.ofFollowupTopic("plan", d.toString());
-          byFp.putIfAbsent(
-              fp,
-              new FollowupCandidate(
-                  fp,
-                  "followup-plan",
-                  "你提到过今天的安排，现在进展如何？",
-                  d.toString(),
-                  "plan"));
-        }
-      }
-    }
-    return List.copyOf(byFp.values());
-  }
-
   private String buildRetrievalQuery(String today, List<CheckinDto> recent) {
     StringBuilder sb = new StringBuilder();
     sb.append("今天是 ").append(today).append("。");
@@ -289,31 +255,14 @@ public class ProactiveService {
     }
   }
 
-  private List<ProactivePromptDto> finalizePrompts(
-      List<ProactivePromptDto> raw,
-      Set<String> suppressed,
-      List<FollowupCandidate> candidates) {
-    // 确保到期追问候选优先进入
-    List<ProactivePromptDto> merged = new ArrayList<>();
-    for (FollowupCandidate c : candidates) {
-      if (suppressed.contains(c.fingerprint())) continue;
-      merged.add(
-          new ProactivePromptDto(
-              c.promptId(), c.text(), c.relatedDate(), PromptSource.followup));
-    }
-    merged.addAll(raw);
-
+  private List<ProactivePromptDto> finalizePrompts(List<ProactivePromptDto> raw, Set<String> suppressed) {
     Map<String, ProactivePromptDto> unique = new LinkedHashMap<>();
-    for (ProactivePromptDto p : merged) {
+    for (ProactivePromptDto p : raw) {
       ProactivePromptDto n = normalizePrompt(p);
+      // Follow-ups require explicit Agent topic authorization, not a legacy daily prompt.
+      if (n.source() == PromptSource.followup) continue;
       String fp = PromptFingerprints.of(n);
       if (suppressed.contains(fp)) continue;
-      // followup 候选用稳定 fingerprint
-      if (n.source() == PromptSource.followup && n.relatedDate() != null) {
-        String topic = n.text().contains("面试") ? "interview" : "plan";
-        fp = PromptFingerprints.ofFollowupTopic(topic, n.relatedDate());
-        if (suppressed.contains(fp)) continue;
-      }
       unique.putIfAbsent(fp, n);
     }
 
@@ -385,19 +334,8 @@ public class ProactiveService {
   }
 
   private List<ProactivePromptDto> heuristicPrompts(
-      String today,
-      List<CheckinDto> recent,
-      List<MemoryDto> memoryList,
-      List<FollowupCandidate> candidates,
-      Set<String> suppressed) {
+      String today, List<CheckinDto> recent, List<MemoryDto> memoryList, Set<String> suppressed) {
     List<ProactivePromptDto> prompts = new ArrayList<>();
-
-    for (FollowupCandidate c : candidates) {
-      if (suppressed.contains(c.fingerprint())) continue;
-      prompts.add(
-          new ProactivePromptDto(
-              c.promptId(), c.text(), c.relatedDate(), PromptSource.followup));
-    }
 
     long tiredCount =
         recent.stream().filter(e -> e.rawText().matches(".*(很累|疲惫|累).*")).count();
@@ -437,6 +375,4 @@ public class ProactiveService {
 
   public record ProactivePayload(List<ProactivePromptDto> prompts) {}
 
-  public record FollowupCandidate(
-      String fingerprint, String promptId, String text, String relatedDate, String topic) {}
 }

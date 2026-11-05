@@ -9,6 +9,9 @@ import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.client.RestClientResponseException;
 
 /** 唯一允许接触模型 SDK 的模块；无 key / 失败时降级 Heuristic */
 @Service
@@ -66,9 +69,32 @@ public class AiGatewayService {
       return new AiResult<>(parsed, AiProvider.llm);
     } catch (Exception e) {
       long elapsed = System.currentTimeMillis() - start;
-      log.warn("ai complete fallback task={} elapsedMs={} reason={}", task, elapsed, e.toString());
-      observer.recordComplete(task, AiProvider.heuristic, "fallback", elapsed, e.toString());
+      String code = errorCode(e);
+      log.warn("ai complete fallback task={} elapsedMs={} errorCode={}", task, elapsed, code);
+      observer.recordComplete(task, AiProvider.heuristic, "fallback", elapsed, code);
       return new AiResult<>(heuristic.get(), AiProvider.heuristic);
+    }
+  }
+
+  /** Conversation cannot be replaced by a heuristic without misleading the user. */
+  public <T> AiResult<T> completeRequired(AiTask task, Object input, TypeReference<T> type) {
+    if (!properties.isConfigured()) {
+      observer.recordSkippedComplete(task);
+      throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "AI conversation is not configured");
+    }
+    long start = System.currentTimeMillis();
+    try {
+      String content = client.chatJson(prompts.system(task), prompts.user(task, input));
+      T parsed = JsonUtils.fromJson(JsonUtils.extractJson(content), type);
+      if (parsed == null) throw new IllegalStateException("empty model response");
+      observer.recordComplete(task, AiProvider.llm, "ok", System.currentTimeMillis() - start, null);
+      return new AiResult<>(parsed, AiProvider.llm);
+    } catch (Exception e) {
+      long elapsed = System.currentTimeMillis() - start;
+      String code = errorCode(e);
+      log.warn("ai required completion failed task={} elapsedMs={} errorCode={}", task, elapsed, code);
+      observer.recordComplete(task, AiProvider.llm, "failed", elapsed, code);
+      throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI conversation temporarily unavailable");
     }
   }
 
@@ -87,20 +113,29 @@ public class AiGatewayService {
       return Optional.of(vectors);
     } catch (Exception e) {
       long elapsed = System.currentTimeMillis() - start;
+      String code = errorCode(e);
       log.warn(
-          "ai embed failed count={} elapsedMs={} reason={}",
+          "ai embed failed count={} elapsedMs={} errorCode={}",
           texts.size(),
           elapsed,
-          e.toString());
-      observer.recordEmbed(AiProvider.llm, "failed", elapsed, texts.size(), e.toString());
+          code);
+      observer.recordEmbed(AiProvider.llm, "failed", elapsed, texts.size(), code);
       return Optional.empty();
     }
+  }
+
+  private static String errorCode(Exception error) {
+    if (error instanceof RestClientResponseException response) {
+      return "http_" + response.getStatusCode().value();
+    }
+    return error.getClass().getSimpleName();
   }
 
   public enum AiTask {
     summary,
     memory_extract,
-    proactive
+    proactive,
+    conversation
   }
 
   public record AiResult<T>(T data, AiProvider provider) {}

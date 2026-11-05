@@ -11,6 +11,7 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -33,6 +34,11 @@ public class ReminderService {
     List<ReminderDto> items =
         reminderMapper.listByUserId(userId).stream().map(this::toDto).toList();
     return new ReminderListDto(items);
+  }
+
+  public List<ReminderDto> listForAgent(int limit) {
+    return reminderMapper.listByUserId(identity.getCurrentUserId()).stream()
+        .limit(Math.min(20, Math.max(1, limit))).map(this::toDto).toList();
   }
 
   @Transactional
@@ -75,6 +81,31 @@ public class ReminderService {
     existing.setUpdatedAt(EntityMapper.now());
     reminderMapper.update(existing);
     return toDto(existing);
+  }
+
+  @Transactional
+  public ReminderDto updateFromAgent(ReminderDto before, ReminderUpdateRequest input) {
+    String userId = identity.getCurrentUserId();
+    ReminderEntity reminder = reminderMapper.lockOwned(before.id(), userId);
+    if (reminder == null || !userId.equals(before.userId())
+        || !Objects.equals(reminder.getTitle(), before.title())
+        || !Objects.equals(reminder.getMessage(), before.message())
+        || !Objects.equals(reminder.getRemindTime(), before.remindTime())
+        || !Objects.equals(reminder.getTimezone(), before.timezone())
+        || reminder.isEnabled() != before.enabled()
+        || !Objects.equals(reminder.getUpdatedAt().toString(), before.updatedAt())) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "reminder changed; request a new proposal");
+    }
+    reminder.setTitle(input.title());
+    reminder.setMessage(input.message());
+    reminder.setRemindTime(input.remindTime());
+    reminder.setTimezone(normalizeTimezone(input.timezone()));
+    reminder.setEnabled(input.enabled());
+    reminder.setUpdatedAt(EntityMapper.now());
+    if (reminderMapper.update(reminder) != 1) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "reminder changed; request a new proposal");
+    }
+    return toDto(reminderMapper.lockOwned(before.id(), userId));
   }
 
   @Transactional

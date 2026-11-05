@@ -43,10 +43,19 @@ wait_http() {
   return 1
 }
 
+api_ready() {
+  curl -fsS "$API_BASE_URL/health/live" 2>/dev/null | \
+    node -e 'let raw=""; process.stdin.on("data", chunk => raw += chunk); process.stdin.on("end", () => { try { process.exit(JSON.parse(raw).service === "today-api" ? 0 : 1); } catch { process.exit(1); } });'
+}
+
 ensure_api() {
-  if curl -fsS "$API_BASE_URL/health" >/dev/null 2>&1; then
+  if api_ready; then
     echo "✓ API already up"
     return 0
+  fi
+  if curl -fsS "$API_BASE_URL/health" >/dev/null 2>&1; then
+    echo "✗ $API_BASE_URL belongs to another service; choose a free API_PORT and API_BASE_URL" >&2
+    return 1
   fi
   echo "→ starting API on :$API_PORT"
   "${TMUX[@]}" has-session -t "=e2e-api" 2>/dev/null || \

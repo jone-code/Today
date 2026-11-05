@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.today.vector.VectorSyncJobMapper">
+  <insert id="enqueue">
+    INSERT INTO vector_sync_jobs (memory_id, user_id, version, state, attempts, next_attempt_at, updated_at)
+    VALUES (#{memoryId}, #{userId}, 1, 'pending', 0, #{now}, #{now})
+    ON DUPLICATE KEY UPDATE version=version+1, state='pending', attempts=0,
+      next_attempt_at=VALUES(next_attempt_at), lease_until=NULL, last_error_code=NULL,
+      updated_at=VALUES(updated_at)
+  </insert>
+  <select id="ready" resultType="com.today.vector.VectorSyncJob">
+    SELECT memory_id AS memoryId, user_id AS userId, version, attempts
+    FROM vector_sync_jobs
+    WHERE (state='pending' AND next_attempt_at &lt;= #{now})
+       OR (state='processing' AND lease_until &lt;= #{now})
+    ORDER BY next_attempt_at ASC LIMIT #{limit}
+  </select>
+  <update id="claim">
+    UPDATE vector_sync_jobs SET version=version+1, state='processing',
+      attempts=attempts+1, lease_until=#{leaseUntil}, updated_at=#{now}
+    WHERE memory_id=#{memoryId} AND user_id=#{userId} AND version=#{version}
+      AND ((state='pending' AND next_attempt_at &lt;= #{now})
+        OR (state='processing' AND lease_until &lt;= #{now}))
+  </update>
+  <delete id="complete">
+    DELETE FROM vector_sync_jobs WHERE memory_id=#{memoryId} AND user_id=#{userId}
+      AND version=#{version} AND state='processing'
+  </delete>
+  <update id="retry">
+    UPDATE vector_sync_jobs SET state='pending', next_attempt_at=#{nextAttemptAt},
+      lease_until=NULL, last_error_code=#{errorCode}, updated_at=#{nextAttemptAt}
+    WHERE memory_id=#{memoryId} AND user_id=#{userId}
+      AND version=#{version} AND state='processing'
+  </update>
+</mapper>

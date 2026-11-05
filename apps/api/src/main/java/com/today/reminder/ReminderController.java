@@ -1,5 +1,6 @@
 package com.today.reminder;
 
+import com.today.common.CreateIdempotencyService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -7,6 +8,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -16,9 +18,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReminderController {
 
   private final ReminderService reminders;
+  private final CreateIdempotencyService creates;
 
-  public ReminderController(ReminderService reminders) {
+  public ReminderController(ReminderService reminders, CreateIdempotencyService creates) {
     this.reminders = reminders;
+    this.creates = creates;
   }
 
   @GetMapping
@@ -27,8 +31,9 @@ public class ReminderController {
   }
 
   @PostMapping
-  public ReminderDto create(@Valid @RequestBody ReminderCreateRequest body) {
-    return reminders.create(body);
+  public ReminderDto create(@Valid @RequestBody ReminderCreateRequest body,
+      @RequestHeader(value = "Idempotency-Key", required = false) String key) {
+    return creates.create("reminder", key, body, ReminderDto.class, () -> reminders.create(body));
   }
 
   @PutMapping("/{id}")

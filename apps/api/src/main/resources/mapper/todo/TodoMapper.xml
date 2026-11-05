@@ -22,6 +22,18 @@
     LIMIT 1
   </select>
 
+  <select id="lockByIdAndUser" resultMap="TodoEntityMap">
+    SELECT id, user_id, title, note, status, due_date, created_at, updated_at, completed_at
+    FROM todos WHERE id=#{id} AND user_id=#{userId} LIMIT 1 FOR UPDATE
+  </select>
+
+  <select id="listForAgent" resultMap="TodoEntityMap">
+    SELECT id, user_id, title, note, status, due_date, created_at, updated_at, completed_at
+    FROM todos WHERE user_id=#{userId}
+    ORDER BY CASE WHEN status='open' THEN 0 ELSE 1 END, due_date IS NULL, due_date ASC, updated_at DESC
+    LIMIT #{limit}
+  </select>
+
   <select id="listByUserId" resultMap="TodoEntityMap">
     SELECT id, user_id, title, note, status, due_date, created_at, updated_at, completed_at
     FROM todos

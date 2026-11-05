@@ -12,6 +12,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
@@ -33,7 +35,7 @@ public class CheckinAiJobService {
   public CheckinAiJobDto enqueueAndKick(
       String userId, String checkinId, String checkinDate, String rawText) {
     CheckinAiJobEntity job = enqueue(userId, checkinId, checkinDate);
-    pipeline.processAfterCheckin(userId, checkinId, checkinDate, rawText, job.getId());
+    kickAfterCommit(userId, checkinId, checkinDate, rawText, job.getId());
     return toDto(job);
   }
 
@@ -83,13 +85,31 @@ public class CheckinAiJobService {
     Instant now = EntityMapper.now();
     jobs.resetForRetry(entity.getId(), CheckinAiJobStatus.pending.name(), now, now);
     CheckinAiJobEntity refreshed = jobs.findByCheckinId(checkinId);
-    pipeline.processAfterCheckin(
+    kickAfterCommit(
         refreshed.getUserId(),
         refreshed.getCheckinId(),
         refreshed.getCheckinDate().toString(),
         null,
         refreshed.getId());
     return toDto(refreshed);
+  }
+
+  private void kickAfterCommit(String userId, String checkinId, String date, String rawText, String jobId) {
+    Runnable kick = () -> pipeline.processAfterCheckin(userId, checkinId, date, rawText, jobId);
+    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+      kick.run();
+      return;
+    }
+    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+      @Override
+      public void afterCommit() {
+        try { kick.run(); }
+        catch (RuntimeException e) {
+          log.warn("checkin ai kickoff deferred to scheduler checkinId={} errorCode={}",
+              checkinId, e.getClass().getSimpleName());
+        }
+      }
+    });
   }
 
   /** 调度器：认领到期任务并同步执行流水线 */
@@ -118,11 +138,15 @@ public class CheckinAiJobService {
     return updated == 1;
   }
 
-  public void markSucceeded(String jobId) {
-    jobs.markSucceeded(jobId, CheckinAiJobStatus.succeeded.name(), EntityMapper.now());
+  public void markSucceeded(String jobId, Instant lockedAt) {
+    jobs.markSucceeded(jobId, lockedAt, CheckinAiJobStatus.succeeded.name(), EntityMapper.now());
   }
 
-  public void markFailed(String jobId, int attempts, int maxAttempts, String error) {
+  public void rescheduleStale(String jobId, Instant lockedAt) {
+    jobs.rescheduleStale(jobId, lockedAt, EntityMapper.now());
+  }
+
+  public void markFailed(String jobId, Instant lockedAt, int attempts, int maxAttempts, String error) {
     Instant now = EntityMapper.now();
     String status =
         attempts >= maxAttempts
@@ -133,7 +157,7 @@ public class CheckinAiJobService {
         error == null
             ? "unknown error"
             : (error.length() > 512 ? error.substring(0, 512) : error);
-    jobs.markFailed(jobId, status, attempts, trimmed, next, now);
+    if (jobs.markFailed(jobId, lockedAt, status, attempts, trimmed, next, now) == 0) return;
     log.warn(
         "checkin ai job failed id={} attempts={}/{} nextRunAt={} error={}",
         jobId,

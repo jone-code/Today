@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.today.agent.AgentProposalMapper">
+  <resultMap id="ProposalMap" type="com.today.persistence.AgentProposalEntity">
+    <id property="id" column="id"/><result property="userId" column="user_id"/>
+    <result property="sourceMessageId" column="source_message_id"/><result property="kind" column="kind"/>
+    <result property="payloadJson" column="payload_json"/><result property="status" column="status"/>
+    <result property="expiresAt" column="expires_at"/><result property="createdAt" column="created_at"/>
+    <result property="confirmedAt" column="confirmed_at"/>
+  </resultMap>
+  <insert id="insert">INSERT INTO agent_proposals (id,user_id,source_message_id,kind,payload_json,status,expires_at,created_at,confirmed_at) VALUES (#{id},#{userId},#{sourceMessageId},#{kind},#{payloadJson},#{status},#{expiresAt},#{createdAt},#{confirmedAt})</insert>
+  <select id="findOwned" resultMap="ProposalMap">SELECT p.* FROM agent_proposals p JOIN conversation_messages m ON m.id=p.source_message_id AND m.user_id=p.user_id JOIN conversations c ON c.id=m.conversation_id AND c.user_id=p.user_id WHERE p.id=#{id} AND p.user_id=#{userId} AND c.deleted_at IS NULL LIMIT 1</select>
+  <select id="lockSourceConversation" resultType="string">SELECT c.id FROM conversations c WHERE c.id = (SELECT m.conversation_id FROM conversation_messages m JOIN agent_proposals p ON p.source_message_id=m.id AND p.user_id=m.user_id WHERE p.id=#{id} AND p.user_id=#{userId} LIMIT 1) AND c.user_id=#{userId} AND c.deleted_at IS NULL FOR UPDATE</select>
+  <select id="listPending" resultMap="ProposalMap">SELECT p.* FROM agent_proposals p JOIN conversation_messages m ON m.id=p.source_message_id AND m.user_id=p.user_id JOIN conversations c ON c.id=m.conversation_id AND c.user_id=p.user_id WHERE p.user_id=#{userId} AND p.status='pending' AND c.deleted_at IS NULL ORDER BY p.created_at ASC</select>
+  <select id="listBySourceMessage" resultMap="ProposalMap">SELECT * FROM agent_proposals WHERE source_message_id=#{sourceMessageId} AND user_id=#{userId}</select>
+  <select id="hasRejectedFollowupReason" resultType="boolean">SELECT EXISTS (SELECT 1 FROM agent_proposals p JOIN conversation_messages m ON m.id=p.source_message_id AND m.user_id=p.user_id JOIN conversations c ON c.id=m.conversation_id AND c.user_id=p.user_id WHERE p.user_id=#{userId} AND c.id=#{conversationId} AND c.deleted_at IS NULL AND p.kind='followup' AND p.status='rejected' AND JSON_UNQUOTE(JSON_EXTRACT(p.payload_json, '$.reason'))=#{reason})</select>
+  <update id="rejectPendingKindByConversation">UPDATE agent_proposals p JOIN conversation_messages m ON m.id=p.source_message_id AND m.user_id=p.user_id JOIN conversations c ON c.id=m.conversation_id AND c.user_id=p.user_id AND c.deleted_at IS NULL SET p.status='rejected', p.confirmed_at=#{at} WHERE p.user_id=#{userId} AND c.id=#{conversationId} AND p.kind=#{kind} AND p.status='pending'</update>
+  <update id="updateStatus">UPDATE agent_proposals SET status=#{status}, confirmed_at=#{confirmedAt} WHERE id=#{id} AND user_id=#{userId} AND status='pending' AND EXISTS (SELECT 1 FROM conversation_messages m JOIN conversations c ON c.id=m.conversation_id AND c.user_id=m.user_id WHERE m.id=agent_proposals.source_message_id AND m.user_id=#{userId} AND c.deleted_at IS NULL)</update>
+  <update id="updatePayload">UPDATE agent_proposals SET payload_json=#{payloadJson} WHERE id=#{id} AND user_id=#{userId} AND kind='checkin' AND status='pending' AND EXISTS (SELECT 1 FROM conversation_messages m JOIN conversations c ON c.id=m.conversation_id AND c.user_id=m.user_id WHERE m.id=agent_proposals.source_message_id AND m.user_id=#{userId} AND c.deleted_at IS NULL)</update>
+</mapper>

@@ -12,6 +12,8 @@ public interface PunchMapper {
 
   PunchHabitEntity findHabitById(@Param("id") String id);
 
+  PunchHabitEntity lockHabitById(@Param("id") String id, @Param("userId") String userId);
+
   List<PunchHabitEntity> listHabitsByUserId(@Param("userId") String userId);
 
   int insertHabit(PunchHabitEntity entity);
@@ -23,8 +25,18 @@ public interface PunchMapper {
   PunchLogEntity findLog(
       @Param("habitId") String habitId, @Param("punchDate") LocalDate punchDate);
 
+  PunchLogEntity lockLog(@Param("habitId") String habitId,
+      @Param("userId") String userId, @Param("punchDate") LocalDate punchDate);
+
   List<PunchLogEntity> listLogsByHabit(
       @Param("habitId") String habitId, @Param("limit") int limit);
+
+  List<PunchLogEntity> listAllLogsByHabit(
+      @Param("habitId") String habitId, @Param("userId") String userId);
+
+  boolean isPhotoReferenced(@Param("path") String path, @Param("userId") String userId);
+
+  int deleteLogsByHabit(@Param("habitId") String habitId, @Param("userId") String userId);
 
   List<PunchLogEntity> listLogsByUserAndDate(
       @Param("userId") String userId, @Param("punchDate") LocalDate punchDate);
