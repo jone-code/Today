@@ -84,6 +84,7 @@ export function mapMemoryDtoToMemoryItem(m: MemoryDto): MemoryItem {
     category: m.category,
     strength: m.strength,
     archived: Boolean(m.archived),
+    chatContextScope: m.chatContextScope ?? "chat_and_timeline",
     updatedAt: m.updatedAt,
   };
 }

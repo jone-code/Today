@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS memories (
   memory_text VARCHAR(512) NOT NULL,
   strength INT NOT NULL DEFAULT 1,
   archived TINYINT(1) NOT NULL DEFAULT 0,
+  chat_context_scope VARCHAR(32) NOT NULL DEFAULT 'chat_and_timeline',
   embedding_json LONGTEXT NULL,
   updated_at DATETIME(3) NOT NULL,
   PRIMARY KEY (id),

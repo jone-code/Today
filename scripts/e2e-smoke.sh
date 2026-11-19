@@ -44,7 +44,7 @@ wait_http() {
 }
 
 api_ready() {
-  curl -fsS "$API_BASE_URL/health/live" 2>/dev/null | \
+  curl -fsS "$API_BASE_URL/health/ready" 2>/dev/null | \
     node -e 'let raw=""; process.stdin.on("data", chunk => raw += chunk); process.stdin.on("end", () => { try { process.exit(JSON.parse(raw).service === "today-api" ? 0 : 1); } catch { process.exit(1); } });'
 }
 
@@ -62,7 +62,7 @@ ensure_api() {
     "${TMUX[@]}" new-session -d -s e2e-api -c "$ROOT/apps/api" -- \
       env PORT="$API_PORT" mvn -q spring-boot:run
   STARTED_API=1
-  wait_http "$API_BASE_URL/health" "API" 90
+  wait_http "$API_BASE_URL/health/ready" "API" 90
 }
 
 ensure_web() {

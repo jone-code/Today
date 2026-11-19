@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -16,6 +17,7 @@ public class AuthService {
   private final UserMapper userMapper;
   private final PasswordEncoder passwordEncoder;
   private final JwtService jwtService;
+  @Value("${today.trial.internal-email-allowlist:}") private String internalEmailAllowlist = "";
 
   public AuthService(
       UserMapper userMapper, PasswordEncoder passwordEncoder, JwtService jwtService) {
@@ -27,6 +29,9 @@ public class AuthService {
   @Transactional
   public AuthTokenResponse register(AuthRegisterInput input) {
     String email = normalizeEmail(input.email());
+    if (!isAllowedInternalEmail(email)) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "trial is limited to internal accounts");
+    }
     if (userMapper.findByEmail(email) != null) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "email already registered");
     }
@@ -52,6 +57,9 @@ public class AuthService {
 
   public AuthTokenResponse login(AuthLoginInput input) {
     String email = normalizeEmail(input.email());
+    if (!isAllowedInternalEmail(email)) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "trial is limited to internal accounts");
+    }
     UserEntity user = userMapper.findByEmail(email);
     if (user == null || !passwordEncoder.matches(input.password(), user.getPasswordHash())) {
       throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "invalid email or password");
@@ -81,6 +89,10 @@ public class AuthService {
     if (email == null || email.isBlank()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "email required");
     }
-    return email.trim().toLowerCase();
+    return email.trim().toLowerCase(java.util.Locale.ROOT);
+  }
+
+  public boolean isAllowedInternalEmail(String email) {
+    return new InternalAccountPolicy(internalEmailAllowlist).isAllowedInternalEmail(email);
   }
 }

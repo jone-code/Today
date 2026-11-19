@@ -24,6 +24,8 @@ import {
   InboxUnreadCountSchema,
   MemoryListDtoSchema,
   MemoryDtoSchema,
+  MemoryContextScopeRequestSchema,
+  MemoryAccessAuditSchema,
   MemoryOriginSchema,
   MemoryUpdateRequestSchema,
   PunchHabitCreateInputSchema,
@@ -36,6 +38,14 @@ import {
   ReminderListDtoSchema,
   ReminderUpdateInputSchema,
   TimelinePageDtoSchema,
+  TodayHomeSchema,
+  WeeklyReviewSchema,
+  ProductEventSchema,
+  VoiceTranscriptionJobSchema,
+  PrivacySettingsSchema,
+  PrivacySettingsRequestSchema,
+  DataRequestSchema,
+  type ProductEvent,
   TodoListDtoSchema,
   UserDtoSchema,
   type PunchHabitCreateInput,
@@ -46,6 +56,12 @@ import {
   type FeedbackCreateRequest,
 } from "@today/contracts";
 import { z } from "zod";
+
+// Expo replaces EXPO_OS in native bundles; keeping this dependency-free also lets
+// the request client run in the Node contract tests without loading React Native.
+const expoOs = typeof process !== "undefined" ? process.env.EXPO_OS : undefined;
+const runtimePlatform = expoOs === "android" || expoOs === "ios" ? expoOs : "unknown";
+const mobileAppVersion = "0.1.0";
 
 export const profileSchema = AgentProfileSchema;
 export const conversationSchema = ConversationSchema;
@@ -61,6 +77,7 @@ export const todaySchema = z.object({
   checkin: z.object({ id: z.string(), date: z.string(), rawText: z.string() }).passthrough().nullable(),
   aiJob: z.object({ status: z.string() }).passthrough().nullable(),
 });
+export const todayHomeSchema = TodayHomeSchema;
 
 export class ApiRequestError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -215,6 +232,49 @@ export class TodayApi {
       { method: "PATCH", body: JSON.stringify({ enabled, maxPerWeek, maxPerDay: 1, timezone }) });
   }
   today() { return this.request(ApiRoutes.checkinToday, todaySchema); }
+  todayHome() { return this.request(ApiRoutes.todayHome, TodayHomeSchema); }
+  track(events: ProductEvent[]) {
+    return this.request(ApiRoutes.events, z.null(), { method: "POST", body: JSON.stringify(events.map(event => ProductEventSchema.parse({
+      ...event,
+      platform: event.platform ?? runtimePlatform,
+      appVersion: event.appVersion ?? mobileAppVersion,
+      eventSchemaVersion: event.eventSchemaVersion ?? 1,
+      occurredAt: event.occurredAt ?? new Date().toISOString(),
+    }))) });
+  }
+  transcribeVoice(uri: string, durationMs: number, requestId: string) {
+    const form = new FormData();
+    form.append("audio", { uri, name: "today-recording.m4a", type: "audio/m4a" } as unknown as Blob);
+    return this.request(`${ApiRoutes.voiceTranscriptions}?durationMs=${encodeURIComponent(String(durationMs))}`, VoiceTranscriptionJobSchema, {
+      method: "POST", headers: { "Idempotency-Key": requestId }, body: form,
+    });
+  }
+  voiceTranscription(id: string) {
+    return this.request(`${ApiRoutes.voiceTranscriptions}/${encodeURIComponent(id)}`, VoiceTranscriptionJobSchema);
+  }
+  retryVoiceTranscription(id: string) {
+    return this.request(`${ApiRoutes.voiceTranscriptions}/${encodeURIComponent(id)}/retry`, VoiceTranscriptionJobSchema, { method: "POST" });
+  }
+  privacy() { return this.request(ApiRoutes.profilePrivacy, PrivacySettingsSchema); }
+  updatePrivacy(input: { version: number; chatMemoryEnabled: boolean; voiceRetention?: "delete_on_success"; followupEnabled: boolean }) {
+    return this.request(ApiRoutes.profilePrivacy, PrivacySettingsSchema, { method: "PATCH", body: JSON.stringify(PrivacySettingsRequestSchema.parse(input)) });
+  }
+  requestDataExport(requestId: string) {
+    return this.request(ApiRoutes.dataExport, DataRequestSchema, { method: "POST", headers: { "Idempotency-Key": requestId } });
+  }
+  dataRequests() { return this.request("/v1/data-requests", z.array(DataRequestSchema)); }
+  dataRequest(id: string) { return this.request(`/v1/data-requests/${encodeURIComponent(id)}`, DataRequestSchema); }
+  dataDownloadToken(id: string) {
+    return this.request(`/v1/data-requests/${encodeURIComponent(id)}/download-token`, z.object({ token: z.string() }), { method: "POST" });
+  }
+  deleteAccount(phrase: string) { return this.request(ApiRoutes.dataDeleteAccount, DataRequestSchema, { method: "POST", body: JSON.stringify({ phrase }) }); }
+  retryDataRequest(id: string) { return this.request(`${ApiRoutes.dataRequestById.replace(":id", encodeURIComponent(id))}/retry`, DataRequestSchema, { method: "POST" }); }
+  weeklyReview(week: string) {
+    return this.request(`${ApiRoutes.weeklyReview}?week=${encodeURIComponent(week)}`, WeeklyReviewSchema);
+  }
+  retryWeeklyReview(week: string) {
+    return this.request(`${ApiRoutes.weeklyReview}/retry?week=${encodeURIComponent(week)}`, WeeklyReviewSchema, { method: "POST" });
+  }
   async summary(date: string) {
     try {
       return await this.request(`/v1/summaries/${encodeURIComponent(date)}`, DaySummaryDtoSchema);
@@ -246,6 +306,7 @@ export class TodayApi {
   memoryOrigins(id: string) {
     return this.request(`${ApiRoutes.memories}/${encodeURIComponent(id)}/origins`, z.array(MemoryOriginSchema));
   }
+  memoryAccessAudit(id: string) { return this.request(`${ApiRoutes.memories}/${encodeURIComponent(id)}/access-audit`, z.array(MemoryAccessAuditSchema)); }
   checkin(id: string) {
     return this.request(`${ApiRoutes.checkins}/${encodeURIComponent(id)}`, CheckinDtoSchema);
   }
@@ -256,6 +317,10 @@ export class TodayApi {
   archiveMemory(id: string, archived: boolean) {
     return this.request(`${ApiRoutes.memories}/${encodeURIComponent(id)}/${archived ? "archive" : "unarchive"}`,
       MemoryDtoSchema, { method: "POST" });
+  }
+  updateMemoryContextScope(id: string, scope: "chat_and_timeline" | "timeline_only" | "disabled", expectedUpdatedAt?: string) {
+    return this.request(`${ApiRoutes.memories}/${encodeURIComponent(id)}/context-scope`, MemoryDtoSchema,
+      { method: "PATCH", body: JSON.stringify(MemoryContextScopeRequestSchema.parse({ scope, expectedUpdatedAt })) });
   }
   deleteMemory(id: string) {
     return this.request(`${ApiRoutes.memories}/${encodeURIComponent(id)}`, z.unknown(), { method: "DELETE" });

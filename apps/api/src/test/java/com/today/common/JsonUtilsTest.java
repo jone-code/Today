@@ -29,4 +29,11 @@ class JsonUtilsTest {
     String json = JsonUtils.extractJson(raw);
     assertTrue(json.contains("坚持运动"));
   }
+
+  @Test
+  void acceptsOnlyJsonObjectsForEventProperties() {
+    assertTrue(JsonUtils.isJsonObject("{\"source\":\"inbox\"}"));
+    assertTrue(!JsonUtils.isJsonObject("[1,2,3]"));
+    assertTrue(!JsonUtils.isJsonObject("not-json"));
+  }
 }

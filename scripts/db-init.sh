@@ -73,6 +73,14 @@ REQUIRED_TABLES=(
   create_requests
   punch_photo_cleanup_jobs
   feedback_reports
+  product_events
+  voice_transcription_jobs
+  weekly_reviews
+  user_privacy_settings
+  memory_access_audit
+  data_requests
+  privacy_settings_audit
+  metrics_access_audit
 )
 
 REQUIRED_COLUMNS=(
@@ -99,6 +107,16 @@ REQUIRED_COLUMNS=(
   create_requests:response_json
   create_requests:request_hash
   feedback_reports:deleted_at
+  product_events:client_request_id
+  product_events:received_at
+  product_events:platform
+  product_events:event_schema_version
+  voice_transcription_jobs:client_request_id
+  voice_transcription_jobs:payload_hash
+  voice_transcription_jobs:media_path
+  user_privacy_settings:chat_memory_enabled
+  user_privacy_settings:followup_enabled
+  memories:chat_context_scope
 )
 
 REQUIRED_UNIQUE_INDEXES=(
@@ -111,15 +129,34 @@ REQUIRED_UNIQUE_INDEXES=(
   inbox_items:uk_inbox_source_schedule
   api_rate_limits:PRIMARY
   create_requests:uk_create_request
+  product_events:uk_product_events_request
+  voice_transcription_jobs:uk_voice_transcription_request
 )
 
 REQUIRED_INDEXES=(
   punch_logs:idx_punch_logs_user_photo
   agent_media:idx_agent_media_cleanup_due
   feedback_reports:idx_feedback_owner
+  product_events:idx_product_events_user_time
+  voice_transcription_jobs:idx_voice_transcription_status
+  memory_access_audit:idx_memory_audit_user_time
+  privacy_settings_audit:idx_privacy_audit_user_time
+  metrics_access_audit:idx_metrics_audit_accessed
 )
 
 MIGRATIONS=(
+  migration-memory-context-scope.sql
+  migration-privacy-audit.sql
+  migration-privacy-settings-audit.sql
+  migration-metrics-access-audit.sql
+  migration-data-requests.sql
+  migration-data-request-queue.sql
+  migration-data-request-steps.sql
+  migration-product-events.sql
+  migration-product-events-schema.sql
+  migration-product-events-idempotency.sql
+  migration-weekly-reviews.sql
+  migration-voice-transcription.sql
   migration-auth-reminder.sql
   migration-memory-embedding.sql
   migration-todo-punch.sql
@@ -159,6 +196,15 @@ run_mysql() {
     mysql -h"$MYSQL_HOST" -P"$MYSQL_PORT" -u"$MYSQL_USER" "-p$MYSQL_PASSWORD" "$@"
   fi
 }
+
+# Queue workers use `FOR UPDATE SKIP LOCKED`, which is available in MySQL 8+
+# and later. Fail early instead of creating a schema that the API cannot serve
+# correctly on an older local server.
+mysql_major="$(run_mysql -N -e "SELECT SUBSTRING_INDEX(VERSION(), '.', 1);" 2>/dev/null || true)"
+if [[ ! "$mysql_major" =~ ^[0-9]+$ || "$mysql_major" -lt 8 ]]; then
+  echo "ERROR: Today requires MySQL 8 or later (detected: ${mysql_major:-unknown})" >&2
+  exit 1
+fi
 
 echo "Initializing schema → $MYSQL_DATABASE"
 if [[ "$USE_DOCKER" -eq 1 ]]; then

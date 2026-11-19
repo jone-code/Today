@@ -9,4 +9,5 @@ public record MemoryDto(
     String text,
     int strength,
     boolean archived,
+    String chatContextScope,
     String updatedAt) {}

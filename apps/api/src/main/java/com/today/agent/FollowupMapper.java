@@ -32,6 +32,8 @@ public interface FollowupMapper {
   int ensurePreference(@Param("userId") String userId, @Param("now") Instant now);
   FollowupPreferenceEntity lockPreference(@Param("userId") String userId);
   int updatePreference(FollowupPreferenceEntity entity);
+  int updatePreferenceEnabled(@Param("userId") String userId, @Param("enabled") boolean enabled,
+      @Param("updatedAt") Instant updatedAt);
   int countDeliveredSinceLocked(@Param("userId") String userId, @Param("since") Instant since);
   int insertInbox(InboxItemEntity entity);
   InboxItemEntity latestForTopic(@Param("userId") String userId, @Param("topicId") String topicId);

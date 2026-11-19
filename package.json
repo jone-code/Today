@@ -32,12 +32,22 @@
     "lint": "npm run lint -w @today/web",
     "typecheck:contracts": "npm run typecheck -w @today/contracts",
     "db:init": "bash scripts/db-init.sh",
+    "db:backup": "bash scripts/db-backup.sh",
+    "test:db-backup": "node scripts/test-db-backup.mjs",
     "db:init:docker": "bash scripts/db-init.sh --docker",
     "db:migrate": "bash scripts/db-migrate.sh",
     "db:schema": "bash scripts/db-init.sh",
     "e2e:smoke": "bash scripts/e2e-smoke.sh",
     "e2e:smoke:api": "node scripts/e2e-smoke-api.mjs",
-    "e2e:smoke:ui": "playwright test"
+    "e2e:smoke:ui": "playwright test",
+    "e2e:metrics": "node scripts/e2e-metrics-api.mjs",
+    "ops:check": "node scripts/check-ops-readiness.mjs",
+    "test:ops-check": "node scripts/test-ops-readiness.mjs",
+    "trial:report": "node scripts/build-trial-report.mjs",
+    "test:trial-report": "node scripts/test-trial-report.mjs",
+    "test:release-check": "node scripts/test-release-config.mjs",
+    "release:check": "node scripts/check-internal-release.mjs",
+    "e2e:data": "node scripts/e2e-data-lifecycle.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1"

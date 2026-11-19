@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, AppState, View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -7,9 +7,10 @@ import { MessageCircle, CalendarDays, CheckSquare, Inbox, UserRound } from "luci
 import * as SecureStore from "expo-secure-store";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { AuthTokenResponseSchema, type AuthTokenResponse } from "@today/contracts";
+import { AuthTokenResponseSchema } from "@today/contracts";
 import { ApiRequestError, TodayApi, normalizeServerUrl } from "./api";
 import { colors } from "./theme";
+import { AccountDeletionScreen } from "./screens/AccountDeletionScreen";
 import { AuthScreen } from "./screens/AuthScreen";
 import { ChatScreen } from "./screens/ChatScreen";
 import { TodayScreen } from "./screens/TodayScreen";
@@ -19,27 +20,11 @@ import { HistoryScreen } from "./screens/HistoryScreen";
 import { ProfileScreen } from "./screens/ProfileScreen";
 import { TimelineScreen } from "./screens/TimelineScreen";
 import { FeedbackScreen } from "./screens/FeedbackScreen";
+import { SessionContext, type Session, useSession } from "./session";
+import type { RootStackParams } from "./navigation";
 
 const SESSION_KEY = "today-session";
-type Session = { baseUrl: string; auth: AuthTokenResponse };
 type LoginHint = { baseUrl: string; email: string; expired: boolean };
-type SessionContextValue = { api: TodayApi; session: Session; signOut: () => Promise<void> };
-const SessionContext = createContext<SessionContextValue | null>(null);
-
-export function useSession() {
-  const context = useContext(SessionContext);
-  if (!context) throw new Error("Session is unavailable");
-  return context;
-}
-
-export type RootStackParams = {
-  Tabs: undefined;
-  History: undefined;
-  Conversation: { id: string };
-  Profile: undefined;
-  Timeline: undefined;
-  Feedback: undefined;
-};
 
 const Stack = createNativeStackNavigator<RootStackParams>();
 const Tabs = createBottomTabNavigator();
@@ -70,17 +55,20 @@ function MainTabs() {
     return () => { unreadRequest.current += 1; subscription.remove(); clearInterval(timer); };
   }, [api]);
 
-  return <Tabs.Navigator screenOptions={({ route }) => ({ headerShown: false, tabBarActiveTintColor: colors.primary,
-    tabBarInactiveTintColor: colors.muted, tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.line, height: 64 },
-    tabBarLabelStyle: { fontSize: 12, fontWeight: "600", marginBottom: 6 },
+  return <Tabs.Navigator screenOptions={({ route }) => ({ headerShown: false, tabBarActiveTintColor: colors.primaryDeep,
+    tabBarInactiveTintColor: colors.muted, tabBarStyle: { backgroundColor: colors.surface, borderTopWidth: 0, height: 78,
+      paddingTop: 8, paddingBottom: 10, shadowColor: colors.ink, shadowOpacity: 0.12, shadowRadius: 18,
+      shadowOffset: { width: 0, height: -6 }, elevation: 18 },
+    tabBarItemStyle: { borderRadius: 18, marginHorizontal: 2 },
+    tabBarLabelStyle: { fontSize: 11, fontWeight: "700", marginBottom: 2 },
     tabBarIcon: ({ color }) => {
       const icons = { Chat: MessageCircle, Today: CalendarDays, Actions: CheckSquare, Inbox: Inbox };
       const Icon = icons[route.name as keyof typeof icons] || UserRound;
       return <Icon color={color} size={22} />;
     },
   })}>
-    <Tabs.Screen name="Chat" component={ChatScreen} options={{ tabBarLabel: "对话" }} />
     <Tabs.Screen name="Today" component={TodayScreen} options={{ tabBarLabel: "今天" }} />
+    <Tabs.Screen name="Chat" component={ChatScreen} options={{ tabBarLabel: "对话" }} />
     <Tabs.Screen name="Actions" component={ActionsScreen} options={{ tabBarLabel: "行动" }} />
     <Tabs.Screen name="Inbox" options={{ tabBarLabel: "收件箱",
       tabBarBadge: unreadCount > 0 ? unreadCount > 99 ? "99+" : unreadCount : undefined,
@@ -96,6 +84,9 @@ function AppContent() {
   const [session, setSession] = useState<Session | null>(null);
   const sessionRef = useRef<Session | null>(null);
   const [loginHint, setLoginHint] = useState<LoginHint | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const deletionRef = useRef(false);
+  deletionRef.current = deleting;
   const [restoring, setRestoring] = useState(true);
 
   useEffect(() => {
@@ -115,7 +106,9 @@ function AppContent() {
             return;
           }
         }
+        const tasks = await new TodayApi(baseUrl, auth.token).dataRequests().catch(() => []);
         if (active) {
+          setDeleting(tasks.some(task => task.type === "delete_account"));
           sessionRef.current = { baseUrl, auth };
           setSession(sessionRef.current);
         }
@@ -133,10 +126,13 @@ function AppContent() {
     api: new TodayApi(session.baseUrl, session.auth.token, () => {
       if (sessionRef.current !== session) return;
       sessionRef.current = null;
-      setLoginHint({ baseUrl: session.baseUrl, email: session.auth.user.email, expired: true });
+      setLoginHint({ baseUrl: session.baseUrl, email: session.auth.user.email, expired: !deletionRef.current });
+      void SecureStore.deleteItemAsync(SESSION_KEY).catch(() => {});
       setSession(null);
     }),
+    onDeletionStarted: () => setDeleting(true),
     signOut: async () => {
+      setDeleting(false);
       await SecureStore.deleteItemAsync(SESSION_KEY);
       sessionRef.current = null;
       setLoginHint(null);
@@ -150,15 +146,22 @@ function AppContent() {
 
   if (!value) return <><AuthScreen initialServer={loginHint?.baseUrl} initialEmail={loginHint?.email}
     expired={loginHint?.expired} onAuthenticated={async (baseUrl, auth) => {
+    const tasks = await new TodayApi(baseUrl, auth.token).dataRequests();
+    setDeleting(tasks.some(task => task.type === "delete_account"));
     const next = { baseUrl, auth };
     await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(next));
     sessionRef.current = next;
     setLoginHint(null);
     setSession(next);
+    void new TodayApi(baseUrl, auth.token).track([{
+      eventName: "auth_completed",
+      screen: "Auth",
+      entityType: "session",
+    }]).catch(() => {});
   }} /><StatusBar style="dark" /></>;
 
   return <SessionContext.Provider value={value}>
-    <NavigationContainer>
+    {deleting ? <AccountDeletionScreen /> : <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerTintColor: colors.ink, headerStyle: { backgroundColor: colors.background },
         headerShadowVisible: false, contentStyle: { backgroundColor: colors.background } }}>
         <Stack.Screen name="Tabs" component={MainTabs} options={{ headerShown: false }} />
@@ -168,7 +171,7 @@ function AppContent() {
         <Stack.Screen name="Timeline" component={TimelineScreen} options={{ title: "回看" }} />
         <Stack.Screen name="Feedback" component={FeedbackScreen} options={{ title: "问题与建议" }} />
       </Stack.Navigator>
-    </NavigationContainer>
+    </NavigationContainer>}
     <StatusBar style="dark" />
   </SessionContext.Provider>;
 }

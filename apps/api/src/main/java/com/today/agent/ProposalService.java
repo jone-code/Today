@@ -583,7 +583,8 @@ public class ProposalService {
     return toDto(e);
   }
   private AgentProposalDto toDto(AgentProposalEntity e) {
-    return new AgentProposalDto(e.getId(), e.getKind(), e.getPayloadJson(), e.getStatus(), e.getSourceMessageId(), e.getCreatedAt().toString());
+    return new AgentProposalDto(e.getId(), e.getKind(), e.getPayloadJson(), e.getStatus(), e.getSourceMessageId(),
+        e.getCreatedAt().toString(), e.getExpiresAt() == null ? null : e.getExpiresAt().toString());
   }
   private String toJson(Object value) {
     try { return objectMapper.writeValueAsString(value); }

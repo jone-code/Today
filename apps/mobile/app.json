@@ -4,13 +4,16 @@
     "slug": "today-personal-agent",
     "scheme": "today",
     "version": "0.1.0",
+    "icon": "./assets/todaylogo.png",
+    "runtimeVersion": { "policy": "appVersion" },
     "orientation": "default",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.comonon.today",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "选择照片作为个人助手形象"
+        "NSPhotoLibraryUsageDescription": "选择照片作为个人助手形象",
+        "NSMicrophoneUsageDescription": "录制语音，转换为今日记录"
       }
     },
     "android": {
@@ -25,7 +28,10 @@
       ["expo-image-picker", {
         "photosPermission": "选择照片作为个人助手形象",
         "cameraPermission": false,
-        "microphonePermission": false
+        "microphonePermission": "录制语音，转换为今日记录"
+      }],
+      ["expo-audio", {
+        "microphonePermission": "录制语音，转换为今日记录"
       }]
     ]
   }

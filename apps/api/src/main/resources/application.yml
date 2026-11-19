@@ -29,6 +29,9 @@ mybatis:
     map-underscore-to-camel-case: true
 
 today:
+  trial:
+    # Empty denies access. Explicitly list internal accounts, including local test accounts.
+    internal-email-allowlist: ${TODAY_INTERNAL_EMAIL_ALLOWLIST:}
   schema:
     # Apply classpath db/schema.sql + migrations on boot when tables are missing.
     bootstrap: ${TODAY_SCHEMA_BOOTSTRAP:true}
@@ -38,6 +41,8 @@ today:
   rate-limit:
     register-per-hour: ${TODAY_RATE_REGISTER_PER_HOUR:60}
     login-ip-per-five-minutes: ${TODAY_RATE_LOGIN_IP_PER_FIVE_MINUTES:100}
+    voice-per-hour: ${TODAY_VOICE_PER_HOUR:20}
+    voice-per-day: ${TODAY_VOICE_PER_DAY:100}
     login-email-per-five-minutes: ${TODAY_RATE_LOGIN_EMAIL_PER_FIVE_MINUTES:10}
     conversation-per-hour: ${TODAY_RATE_CONVERSATION_PER_HOUR:30}
     conversation-per-day: ${TODAY_RATE_CONVERSATION_PER_DAY:120}
@@ -57,6 +62,14 @@ today:
     job-poll-ms: ${TODAY_AI_JOB_POLL_MS:15000}
     admin-token: ${TODAY_AI_ADMIN_TOKEN:}
     log-retain-days: ${TODAY_AI_LOG_RETAIN_DAYS:7}
+  features:
+    data-export-enabled: ${TODAY_DATA_EXPORT_ENABLED:true}
+    account-delete-enabled: ${TODAY_ACCOUNT_DELETE_ENABLED:true}
+  data:
+    export-key: ${TODAY_DATA_EXPORT_KEY:}
+  metrics:
+    admin-token: ${TODAY_METRICS_ADMIN_TOKEN:}
+    audit-retain-days: ${TODAY_METRICS_AUDIT_RETAIN_DAYS:180}
   vector:
     # mysql = 扫描 embedding_json；qdrant = 外挂向量库（失败回退 mysql）
     provider: ${TODAY_VECTOR_PROVIDER:mysql}

@@ -6,8 +6,11 @@ import {
   apiArchiveMemory,
   apiDeleteMemory,
   apiGetMemories,
+  apiGetMemoryAccessAudit,
+  apiGetMemoryOrigins,
   apiUnarchiveMemory,
   apiUpdateMemory,
+  apiUpdateMemoryContextScope,
   type MemoryDto,
 } from "@/shared/lib/api-client";
 import { useAuth } from "@/shared/lib/auth-context";
@@ -42,6 +45,9 @@ export function MemoryPanel() {
   const [includeArchived, setIncludeArchived] = useState(false);
   const [edit, setEdit] = useState<EditDraft | null>(null);
   const [actionError, setActionError] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [detail, setDetail] = useState<{ origins: Awaited<ReturnType<typeof apiGetMemoryOrigins>>; audits: Awaited<ReturnType<typeof apiGetMemoryAccessAudit>> } | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const enabled = authReady && !!user && mode === "api";
 
@@ -83,6 +89,25 @@ export function MemoryPanel() {
     mutationFn: (id: string) => apiDeleteMemory(id),
     onSuccess: invalidate,
   });
+
+  const scopeMutation = useMutation({
+    mutationFn: ({ id, scope, expectedUpdatedAt }: { id: string; scope: MemoryDto["chatContextScope"]; expectedUpdatedAt: string }) =>
+      apiUpdateMemoryContextScope(id, scope, expectedUpdatedAt),
+    onSuccess: invalidate,
+    onError: async () => {
+      await queryClient.invalidateQueries({ queryKey: memoryKeys.all });
+    },
+  });
+
+  const toggleDetail = async (id: string) => {
+    if (expandedId === id) { setExpandedId(null); setDetail(null); return; }
+    setExpandedId(id); setDetail(null); setDetailLoading(true); setActionError("");
+    try {
+      const [origins, audits] = await Promise.all([apiGetMemoryOrigins(id), apiGetMemoryAccessAudit(id)]);
+      setDetail({ origins, audits });
+    } catch (err) { setActionError(err instanceof Error ? err.message : "来源读取失败"); }
+    finally { setDetailLoading(false); }
+  };
 
   if (!ready || (enabled && listQuery.isLoading)) {
     return <p className="muted loading-line">正在整理长期记忆…</p>;
@@ -132,7 +157,8 @@ export function MemoryPanel() {
     try {
       await fn();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "操作失败");
+      const status = err && typeof err === "object" && "status" in err ? (err as { status?: number }).status : undefined;
+      setActionError(status === 409 ? "这条记忆已被其他设备修改，已刷新最新内容。" : err instanceof Error ? err.message : "操作失败");
     }
   };
 
@@ -229,6 +255,31 @@ export function MemoryPanel() {
                     </span>
                     <p>{m.text}</p>
                     <span className="memory-strength">提及 {m.strength} 次</span>
+                    {canManage ? <div className="memory-scope">
+                      <span>Chat 使用范围</span>
+                      {(["chat_and_timeline", "timeline_only", "disabled"] as const).map(scope => (
+                        <button key={scope} type="button" className={m.chatContextScope === scope ? "chip active" : "chip"}
+                          disabled={scopeMutation.isPending}
+                          onClick={() => void runAction(() => scopeMutation.mutateAsync({ id: m.id, scope, expectedUpdatedAt: m.updatedAt }))}>
+                          {scope === "chat_and_timeline" ? "Chat 可用" : scope === "timeline_only" ? "仅回看" : "停用"}
+                        </button>
+                      ))}
+                    </div> : null}
+                    {canManage ? <button type="button" className="text-btn memory-detail-toggle" onClick={() => void toggleDetail(m.id)}>
+                      {expandedId === m.id ? "收起来源与使用记录" : "查看来源与使用记录"}
+                    </button> : null}
+                    {expandedId === m.id ? <div className="memory-detail">
+                      {detailLoading ? <span className="muted">正在加载来源和使用记录…</span> : detail ? <>
+                        <strong>来源</strong>
+                        {detail.origins.length ? detail.origins.map(origin => <span key={`${origin.kind}-${origin.sourceId}`}>
+                          {origin.kind === "checkin" ? `每日记录 · ${origin.date ?? ""}` : "对话记录"}
+                        </span>) : <span className="muted">没有可查看的来源</span>}
+                        <strong>最近使用记录</strong>
+                        {detail.audits.length ? detail.audits.slice(0, 10).map(audit => <span key={audit.id}>
+                          {audit.source === "chat" ? "Chat" : audit.source === "timeline" ? "时间轴" : audit.source} · {audit.action === "retrieved" ? "被读取" : audit.action} · {new Date(audit.occurredAt).toLocaleString("zh-CN")}
+                        </span>) : <span className="muted">暂时没有使用记录</span>}
+                      </> : null}
+                    </div> : null}
                   </div>
                   <div className="module-actions">
                     {canManage ? (

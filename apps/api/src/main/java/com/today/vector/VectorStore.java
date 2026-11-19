@@ -16,6 +16,8 @@ public interface VectorStore {
 
   void delete(String memoryId);
 
+  default void deleteStrict(String memoryId) { delete(memoryId); }
+
   /** 更新归档等元数据；无向量时实现可 no-op */
   void setArchived(String memoryId, String userId, boolean archived);
 

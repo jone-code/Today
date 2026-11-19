@@ -4,7 +4,8 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ChevronRight, Trash2 } from "lucide-react-native";
 import type { Conversation } from "@today/contracts";
-import { useSession, type RootStackParams } from "../App";
+import { useSession } from "../session";
+import type { RootStackParams } from "../navigation";
 import { colors } from "../theme";
 import { Empty, Heading, IconAction, Notice, Page, Separator, messageOf } from "../ui";
 
@@ -43,7 +44,8 @@ export function HistoryScreen() {
 
 const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center" },
-  open: { minHeight: 72, flex: 1, flexDirection: "row", alignItems: "center", gap: 10 },
-  title: { color: colors.ink, fontSize: 16, fontWeight: "600" },
+  open: { minHeight: 78, flex: 1, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 15,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 17 },
+  title: { color: colors.ink, fontSize: 16, fontWeight: "800" },
   detail: { color: colors.muted, fontSize: 13, marginTop: 6 },
 });

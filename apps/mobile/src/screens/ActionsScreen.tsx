@@ -8,10 +8,10 @@ import { Camera, Check, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react-nat
 import type { AgentAction, PunchHabitDto, ReminderDto, TodoDto } from "@today/contracts";
 import { actionDraftKey, deleteActionDraftAfterWrites, readActionDraft, writeActionDraft, type ActionDraft } from "../actionDraft";
 import { deletePhotoDraft, photoDraftExists, photoDraftUri, prunePhotoDrafts, savePhotoDraft } from "../punchPhotoDraft";
-import { useSession } from "../App";
+import { useSession } from "../session";
 import { ApiRequestError } from "../api";
 import { colors } from "../theme";
-import { Action, Empty, Field, Heading, Notice, Page, Separator, messageOf } from "../ui";
+import { Action, Empty, Field, Heading, Notice, Page, ProgressRing, Separator, Surface, messageOf } from "../ui";
 
 type Mode = "todos" | "habits" | "reminders";
 type HabitForm = { id?: string; requestId: string; title: string; description: string };
@@ -285,7 +285,14 @@ export function ActionsScreen() {
     </View> : null}
   </Page>;
 
-  return <Page><Heading title="行动" />
+  const doneTodos = todos.filter(item => item.status === "done").length;
+  const todoProgress = todos.length ? doneTodos / todos.length : 0;
+  return <Page><Heading title="行动" detail="把重要的事留给现在，剩下的慢慢来。" />
+    <Surface tone="sage" style={styles.progressCard}>
+      <ProgressRing value={todoProgress} color={colors.primaryDeep} />
+      <View style={styles.progressCopy}><Text style={styles.progressTitle}>{todos.length ? "今天完成了 " + doneTodos + " / " + todos.length + " 件事" : "给今天留一个轻量的下一步"}</Text>
+        <Text style={styles.progressDetail}>Today 会把对话里的想法整理成可以执行的行动。</Text></View>
+    </Surface>
     <View accessibilityRole="tablist" style={styles.tabs}>
       {([ ["todos", "待办"], ["habits", "习惯"], ["reminders", "提醒"] ] as const).map(([key, label]) =>
         <Pressable key={key} accessibilityRole="tab" accessibilityState={{ selected: mode === key }}
@@ -354,10 +361,10 @@ export function ActionsScreen() {
           </View>
           {habit.todayPhotoUrl ? <Image accessibilityLabel={`${habit.title}的打卡照片`}
             source={{ uri: `${session.baseUrl}${habit.todayPhotoUrl}`,
-              headers: { Authorization: `Bearer ${session.auth.token}` } }} style={styles.photo} /> : null}
+              headers: { Authorization: `Bearer ${session.auth.token}` } }} style={styles.photo as any} /> : null}
           {photo?.habitId === habit.id ? <View style={styles.photoDraft}>
             {photoMissing ? <Notice danger>待上传照片已从设备移除，请取消后重新选择。</Notice>
-              : <Image source={{ uri: photo.uri }} accessibilityLabel="待保存的打卡照片" style={styles.photo} />}
+              : <Image source={{ uri: photo.uri }} accessibilityLabel="待保存的打卡照片" style={styles.photo as any} />}
             {photo.date !== date ? <Text style={styles.itemMeta}>这张照片将记录在 {photo.date}。</Text> : null}
             {habit.punchedToday && habit.todayPhotoUrl ? <Text style={styles.itemMeta}>保存会替换今天原有的照片。</Text> : null}
             <View style={styles.buttons}>
@@ -455,28 +462,33 @@ function actionName(kind: string) {
 }
 
 const styles = StyleSheet.create({
+  progressCard: { flexDirection: "row", alignItems: "center", gap: 16, marginBottom: 20, padding: 17 },
+  progressCopy: { flex: 1, gap: 5 }, progressTitle: { color: colors.ink, fontSize: 16, fontWeight: "800", lineHeight: 22 },
+  progressDetail: { color: colors.inkSoft, fontSize: 12, lineHeight: 18 },
   tabs: { flexDirection: "row", gap: 8, marginBottom: 24 },
-  tab: { flex: 1, minHeight: 48, borderWidth: 1, borderColor: colors.line, borderRadius: 7,
+  tab: { flex: 1, minHeight: 46, borderWidth: 1, borderColor: colors.line, borderRadius: 999,
     alignItems: "center", justifyContent: "center", backgroundColor: colors.surface },
-  tabActive: { backgroundColor: colors.primarySoft, borderColor: colors.primary },
-  tabText: { color: colors.muted, fontSize: 15, fontWeight: "600" },
-  tabTextActive: { color: colors.primary },
+  tabActive: { backgroundColor: colors.primaryDeep, borderColor: colors.primaryDeep },
+  tabText: { color: colors.muted, fontSize: 13, fontWeight: "700" },
+  tabTextActive: { color: colors.onPrimary },
   pressed: { opacity: 0.65 },
-  list: { marginTop: 20 }, todo: { minHeight: 50, flexDirection: "row", gap: 14, alignItems: "center" },
-  checkbox: { width: 24, height: 24, borderWidth: 2, borderColor: colors.primary, borderRadius: 5,
+  list: { marginTop: 20 }, todo: { minHeight: 62, flexDirection: "row", gap: 14, alignItems: "center", paddingHorizontal: 14,
+    borderRadius: 16, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, marginBottom: 8 },
+  checkbox: { width: 24, height: 24, borderWidth: 2, borderColor: colors.primary, borderRadius: 8,
     alignItems: "center", justifyContent: "center" },
-  checked: { backgroundColor: colors.primary },
+  checked: { backgroundColor: colors.primaryDeep, borderColor: colors.primaryDeep },
   itemText: { flex: 1, color: colors.ink, fontSize: 16, lineHeight: 24 },
   done: { textDecorationLine: "line-through", color: colors.muted },
   sectionTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 16 },
-  sectionTitle: { color: colors.ink, fontSize: 19, fontWeight: "700", flexShrink: 1 },
-  rowItem: { gap: 12 }, itemTop: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 48 },
+  sectionTitle: { color: colors.ink, fontSize: 18, fontWeight: "800", flexShrink: 1 },
+  rowItem: { gap: 12, padding: 16, borderRadius: 18, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, marginBottom: 10 },
+  itemTop: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 48 },
   itemMain: { flex: 1, minWidth: 0, gap: 4 },
   itemTitle: { color: colors.ink, fontSize: 16, lineHeight: 24, fontWeight: "600" },
   itemMeta: { color: colors.muted, fontSize: 14, lineHeight: 21 },
   buttons: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  form: { paddingVertical: 16, marginBottom: 16, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.line },
-  photoDraft: { gap: 12, paddingVertical: 8 }, photo: { width: 96, height: 96, borderRadius: 7 },
+  form: { padding: 16, marginBottom: 16, borderRadius: 18, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line },
+  photoDraft: { gap: 12, paddingVertical: 8 }, photo: { width: 96, height: 96, borderRadius: 14 },
   history: { marginTop: 32, gap: 12 }, historyTitle: { color: colors.ink, fontSize: 16, fontWeight: "700" },
   historyItem: { borderBottomWidth: 1, borderBottomColor: colors.line, paddingVertical: 10, gap: 4 },
   historySummary: { color: colors.ink, fontSize: 15, lineHeight: 22 },

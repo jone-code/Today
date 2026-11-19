@@ -31,6 +31,59 @@ import org.junit.jupiter.api.Test;
 class MemoryServiceTest {
 
   @Test
+  void auditFailureDoesNotReturnUnauditedMemoryContext() {
+    MemoryMapper mapper = mock(MemoryMapper.class);
+    IdentityService identity = mock(IdentityService.class);
+    var privacy = mock(com.today.privacy.PrivacySettingsService.class);
+    var audit = mock(MemoryAccessAuditMapper.class);
+    when(identity.getCurrentUserId()).thenReturn("owner");
+    when(privacy.chatMemoryEnabled("owner")).thenReturn(true);
+    var memory = new MemoryEntity(); memory.setId("memory"); memory.setCategory("life");
+    memory.setMemoryText("private");
+    when(mapper.listConfirmedForAgent("owner", 10)).thenReturn(List.of(memory));
+    when(audit.insert(any(), eq("owner"), eq("memory"), any(), any(), any(), any(), any()))
+        .thenThrow(new IllegalStateException("audit unavailable"));
+    var service = new MemoryService(mapper, mock(AiGatewayService.class), identity, mock(VectorStore.class),
+        mock(MemorySourceMapper.class), mock(VectorSyncJobMapper.class), privacy, audit);
+    org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+        () -> service.confirmedForConversation(10));
+  }
+
+  @Test
+  void disabledGlobalMemorySkipsSqlVectorEmbeddingAndAudit() {
+    MemoryMapper mapper = mock(MemoryMapper.class);
+    IdentityService identity = mock(IdentityService.class);
+    AiGatewayService gateway = mock(AiGatewayService.class);
+    VectorStore vectors = mock(VectorStore.class);
+    var privacy = mock(com.today.privacy.PrivacySettingsService.class);
+    var audit = mock(MemoryAccessAuditMapper.class);
+    when(identity.getCurrentUserId()).thenReturn("owner");
+    when(privacy.chatMemoryEnabled("owner")).thenReturn(false);
+    var service = new MemoryService(mapper, gateway, identity, vectors,
+        mock(MemorySourceMapper.class), mock(VectorSyncJobMapper.class), privacy, audit);
+    assertEquals(List.of(), service.confirmedForConversation(10));
+    assertEquals(List.of(), service.retrieveRelevant("private query", 5));
+    verifyNoInteractions(mapper, gateway, vectors, audit);
+  }
+
+  @Test
+  void staleContextScopeVersionReturnsConflict() {
+    MemoryMapper mapper = mock(MemoryMapper.class);
+    IdentityService identity = mock(IdentityService.class);
+    when(identity.getCurrentUserId()).thenReturn("owner");
+    MemoryEntity existing = new MemoryEntity(); existing.setId("memory"); existing.setUserId("owner");
+    when(mapper.findVisibleById("memory", "owner")).thenReturn(existing);
+    when(mapper.updateChatContextScopeIfCurrent(eq("memory"), eq("owner"), eq("disabled"), any(), any()))
+        .thenReturn(0);
+    var service = new MemoryService(mapper, mock(AiGatewayService.class), identity, mock(VectorStore.class),
+        mock(MemorySourceMapper.class), mock(VectorSyncJobMapper.class));
+    var failure = org.junit.jupiter.api.Assertions.assertThrows(
+        org.springframework.web.server.ResponseStatusException.class,
+        () -> service.updateChatContextScope("memory", "disabled", "2026-11-18T00:00:00Z"));
+    assertEquals(409, failure.getStatusCode().value());
+  }
+
+  @Test
   void sourcesAreScopedToVisibleMemoryAndContainNoOriginalText() {
     MemoryMapper mapper = mock(MemoryMapper.class);
     MemorySourceMapper sources = mock(MemorySourceMapper.class);

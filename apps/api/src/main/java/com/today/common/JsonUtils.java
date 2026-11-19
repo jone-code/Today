@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -21,6 +22,14 @@ public final class JsonUtils {
       return MAPPER.writeValueAsString(values);
     } catch (JsonProcessingException e) {
       throw new IllegalStateException("failed to serialize json list", e);
+    }
+  }
+
+  public static String toJson(Object value) {
+    try {
+      return MAPPER.writeValueAsString(value);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("failed to serialize json", e);
     }
   }
 
@@ -45,6 +54,19 @@ public final class JsonUtils {
       return MAPPER.readValue(json, type);
     } catch (JsonProcessingException e) {
       throw new IllegalStateException("failed to deserialize json", e);
+    }
+  }
+
+  /** Returns true only for a syntactically valid JSON object. */
+  public static boolean isJsonObject(String json) {
+    if (json == null || json.isBlank()) return false;
+    try {
+      JsonNode node = MAPPER.reader()
+          .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+          .readTree(json);
+      return node != null && node.isObject();
+    } catch (JsonProcessingException e) {
+      return false;
     }
   }
 

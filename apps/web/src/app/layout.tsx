@@ -1,19 +1,6 @@
 import type { Metadata } from "next";
-import { Fraunces, Noto_Sans_SC } from "next/font/google";
 import { Providers } from "@/shared/ui/Providers";
 import "./globals.css";
-
-const display = Fraunces({
-  variable: "--font-display",
-  subsets: ["latin"],
-  axes: ["SOFT", "WONK", "opsz"],
-});
-
-const body = Noto_Sans_SC({
-  variable: "--font-body",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
 
 export const metadata: Metadata = {
   title: "Today — AI 记住你的每一天",
@@ -27,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN" className={`${display.variable} ${body.variable} h-full`}>
+    <html lang="zh-CN" className="h-full">
       <body className="site-shell antialiased">
         <Providers>{children}</Providers>
       </body>

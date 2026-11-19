@@ -104,6 +104,14 @@ AI 自动整理、总结、建立长期记忆，并在未来主动关联。随�
 
 业务模块：`checkin` · `summary` · `memory` · `timeline` · `proactive` · `identity` · `reminder` · `todo` · `punch` · `ai-gateway`
 
+## 当前开发与验收
+
+移动端与隐私/导出/删除切片的最新实现、测试证据和剩余发布门槛见 [内部试用开发与验证记录](docs/internal-trial-validation.md)。本地登录也必须显式配置 `TODAY_INTERNAL_EMAIL_ALLOWLIST`；导出需要 `TODAY_DATA_EXPORT_KEY`。变量说明见 `.env.example`。
+
+语音记录使用设备录音和服务端转写任务，当前未接入真实供应商；失败时回退文字输入。音频默认短期保存并在成功或过期后清理，上传限制为 120 秒 / 10 MiB。内部试用可通过 `TODAY_VOICE_PER_HOUR` 和 `TODAY_VOICE_PER_DAY` 调整账号级限额，发布前运行 `npm run release:check`。
+
+管理员指标访问审计默认保留 180 天，由 UTC 定时任务清理；可用 `TODAY_METRICS_AUDIT_RETAIN_DAYS` 调整，发布检查要求为 1～3650 天。
+
 ## 本地开发
 
 ### 一键全栈（推荐验证发布形态）
@@ -113,7 +121,7 @@ bash scripts/deploy-docker.sh up   # 或 npm run deploy:docker
 # 等价：cp .env.example .env && npm run stack:up
 ```
 
-说明见 [`docs/deploy.md`](docs/deploy.md)。CI：推送 / PR 到 `main` 会跑 Maven 测试、Web lint/build、Docker 镜像构建。
+说明见 [`docs/deploy.md`](docs/deploy.md)。CI：推送 / PR 到 `main` 会跑 API/MySQL 8.4 测试与备份恢复、Web lint/build 和 Chromium 指标看板回归、移动端类型/测试/双端 Expo 导出、EAS/native 配置检查、macOS CocoaPods 原生配置以及 Docker 镜像构建。
 
 ### 本机热更新开发
 
@@ -146,6 +154,15 @@ npm run dev:web
 npx playwright install chromium   # 首次
 npm run e2e:smoke
 # 仅 API：npm run e2e:smoke:api
+
+# 部署后检查就绪探针、指标鉴权和脱敏响应
+TODAY_METRICS_ADMIN_TOKEN=<admin-token> npm run ops:check
+# 试用结束生成聚合决策报告（不含原始记录）
+TODAY_METRICS_ADMIN_TOKEN=<admin-token> \
+TODAY_TRIAL_FROM=2026-11-01 TODAY_TRIAL_TO=2026-11-07 \
+npm run trial:report
+# 本地验证报告字段、反馈用户分布和事实对账
+npm run test:trial-report
 ```
 
 向量库说明见 [`docs/vector-store.md`](docs/vector-store.md)。切换 Qdrant 后可对存量记忆执行：
@@ -157,4 +174,4 @@ TODAY_AUTH_TOKEN=<jwt> FILL_MISSING=true npm run vector:reindex
 
 AI 调用可观测见 [`docs/ai-observability.md`](docs/ai-observability.md)（`/health.ai`、`/v1/admin/ai/stats`）。
 
-当前状态：**前端已迁入 `apps/web` 并接入 TanStack Query**；Todo / 习惯打卡已落地（支持本地目录照片打卡，`TODAY_MEDIA_PATH` 挂载）；默认强制登录走 API；`aigateway` 已接通 OpenAI 兼容 LLM + Embedding 检索；checkin AI 流水线异步且可重试；记忆可管理；e2e 冒烟可用；向量检索可外挂 Qdrant 并可 reindex；AI 调用可审计；Compose 一键全栈 + GitHub Actions CI 可用。
+当前状态：**前端已迁入 `apps/web` 并接入 TanStack Query**；Web 和移动端都会上报登录完成、Today 查看、记录保存和总结查看事件，并携带平台、应用版本与事件契约版本；Todo / 习惯打卡已落地（支持本地目录照片打卡，`TODAY_MEDIA_PATH` 挂载）；默认强制登录走 API；`aigateway` 已接通 OpenAI 兼容 LLM + Embedding 检索；checkin AI 流水线异步且可重试；记忆可管理；e2e 冒烟可用；向量检索可外挂 Qdrant 并可 reindex；AI 调用可审计；Compose 一键全栈 + GitHub Actions CI 可用。

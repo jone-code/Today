@@ -47,6 +47,12 @@
       due_date ASC,
       updated_at DESC
   </select>
+  <select id="listCompletedByUserIdAndRange" resultMap="TodoEntityMap">
+    SELECT id,user_id,title,note,status,due_date,created_at,updated_at,completed_at
+    FROM todos WHERE user_id=#{userId} AND status='done'
+      AND completed_at &gt;= #{from} AND completed_at &lt; #{to}
+    ORDER BY completed_at ASC
+  </select>
 
   <insert id="insert">
     INSERT INTO todos (

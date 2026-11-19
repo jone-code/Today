@@ -4,10 +4,11 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ArrowRight, Check, Clock3, Pencil } from "lucide-react-native";
 import type { Appointment, FollowupTopic, InboxItem } from "@today/contracts";
-import { useSession, type RootStackParams } from "../App";
+import { useSession } from "../session";
+import type { RootStackParams } from "../navigation";
 import { ApiRequestError } from "../api";
 import { colors } from "../theme";
-import { Action, Empty, Field, Heading, IconAction, Notice, Page, Separator, messageOf } from "../ui";
+import { Action, Empty, Field, Heading, IconAction, Notice, Page, SectionLabel, Separator, Surface, messageOf } from "../ui";
 
 export function InboxScreen({ onUnreadChange }: { onUnreadChange: (count: number) => void }) {
   const { api } = useSession();
@@ -30,7 +31,9 @@ export function InboxScreen({ onUnreadChange }: { onUnreadChange: (count: number
   const [snoozeDate, setSnoozeDate] = useState("");
   const [itemBusy, setItemBusy] = useState<string | null>(null);
   const [itemAction, setItemAction] = useState<string | null>(null);
-  const refresh = useCallback(() => { void Promise.all([api.inbox(), api.appointments(), api.followupTopics(), api.followupPreferences()])
+  const refresh = useCallback(() => {
+    void api.track([{ eventName: "inbox_viewed", screen: "Inbox" }]).catch(() => {});
+    void Promise.all([api.inbox(), api.appointments(), api.followupTopics(), api.followupPreferences()])
     .then(([inbox, upcoming, activeTopics, pref]) => {
       setItems(inbox); setAppointments(upcoming); setTopics(activeTopics); setTimezone(pref.timezone); setError("");
       void api.unreadCount().then(({ count }) => onUnreadChange(count)).catch(() => {});
@@ -43,6 +46,9 @@ export function InboxScreen({ onUnreadChange }: { onUnreadChange: (count: number
     setItemBusy(item.id); setItemAction(action);
     try {
       const updated = await api.updateInbox(item.id, action);
+      void api.track([{ eventName: action === "continue" ? "followup_continued" : action === "dismiss" ? "inbox_item_dismissed" : "inbox_item_read",
+        screen: "Inbox", entityType: "inbox_item", entityId: item.id,
+        propertiesJson: JSON.stringify({ sourceKind: item.sourceKind }) }]).catch(() => {});
       refresh();
       setError("");
       if (action === "continue" && updated.conversationId) {
@@ -61,6 +67,7 @@ export function InboxScreen({ onUnreadChange }: { onUnreadChange: (count: number
     setItemBusy(id); setItemAction("snooze");
     try {
       await api.snoozeInbox(id, snoozeDate);
+      void api.track([{ eventName: "followup_snoozed", screen: "Inbox", entityType: "inbox_item", entityId: id }]).catch(() => {});
       setSnoozingId(null); setSnoozeDate(""); setError(""); refresh();
     } catch (failure) { setError(messageOf(failure)); }
     finally { setItemBusy(null); setItemAction(null); }
@@ -73,7 +80,7 @@ export function InboxScreen({ onUnreadChange }: { onUnreadChange: (count: number
         if (itemBusy) return;
         setItemBusy(item.id); setItemAction("stop");
         void api.stopTopic(item.sourceId)
-          .then(() => { setFeedback("已停止这件事的跟进"); refresh(); })
+          .then(() => { void api.track([{ eventName: "followup_stopped", screen: "Inbox", entityType: "followup_topic", entityId: item.sourceId }]).catch(() => {}); setFeedback("已停止这件事的跟进"); refresh(); })
           .catch(e => setError(messageOf(e))).finally(() => { setItemBusy(null); setItemAction(null); });
       } },
     ]);
@@ -88,7 +95,13 @@ export function InboxScreen({ onUnreadChange }: { onUnreadChange: (count: number
           onPress: () => {
             setTopicBusy(topic.id);
             void (stopping ? api.stopTopic(topic.id) : api.resumeTopic(topic.id))
-              .then(() => { setFeedback(stopping ? "已停止这件事的跟进" : "已重新开启跟进"); refresh(); })
+              .then(() => {
+                void api.track([{
+                  eventName: stopping ? "followup_stopped" : "followup_resumed",
+                  screen: "Inbox", entityType: "followup_topic", entityId: topic.id,
+                }]).catch(() => {});
+                setFeedback(stopping ? "已停止这件事的跟进" : "已重新开启跟进"); refresh();
+              })
               .catch(e => setError(messageOf(e))).finally(() => setTopicBusy(null));
           } },
       ]);
@@ -120,6 +133,10 @@ export function InboxScreen({ onUnreadChange }: { onUnreadChange: (count: number
         expectedReason: editingTopic.reason, expectedNextEligibleAt: editingTopic.nextEligibleAt,
       });
       setTopics(current => current.map(item => item.id === updated.id ? updated : item));
+      void api.track([{
+        eventName: "followup_updated", screen: "Inbox", entityType: "followup_topic", entityId: updated.id,
+        propertiesJson: JSON.stringify({ reasonChanged: reason !== editingTopic.reason, dateChanged: topicDate !== oldDate }),
+      }]).catch(() => {});
       setEditingTopic(null); setFeedback("跟进设置已保存"); setError(""); refresh();
     } catch (failure) {
       setTopicError(failure instanceof ApiRequestError && failure.status === 409
@@ -134,7 +151,10 @@ export function InboxScreen({ onUnreadChange }: { onUnreadChange: (count: number
       { text: "取消约定", style: "destructive", onPress: () => {
         setCancelingId(item.id);
         void api.cancelAppointment(item.id)
-          .then(() => { setFeedback("约定已取消"); refresh(); })
+          .then(() => {
+            void api.track([{ eventName: "appointment_cancelled", screen: "Inbox", entityType: "appointment", entityId: item.id }]).catch(() => {});
+            setFeedback("约定已取消"); refresh();
+          })
           .catch(e => setError(messageOf(e)))
           .finally(() => setCancelingId(null));
       } },
@@ -142,10 +162,15 @@ export function InboxScreen({ onUnreadChange }: { onUnreadChange: (count: number
   }
 
   return <Page><Heading title="收件箱" detail="站内消息与约定" />
+    <Surface tone="dark" style={styles.hero}>
+      <Text style={styles.heroEyebrow}>A LITTLE NUDGE FROM TODAY</Text>
+      <Text style={styles.heroTitle}>{items.length ? "有 " + items.length + " 件事，" : "今天还没有新消息，"}{"\n"}值得你看一眼。</Text>
+      <Text style={styles.heroDetail}>所有主动跟进都在这里，不打断你，也不会自动打开聊天。</Text>
+    </Surface>
     {error ? <Notice danger>{error}</Notice> : null}
     {feedback ? <Notice>{feedback}</Notice> : null}
     {topics.length ? <View style={styles.upcoming}>
-      <Text style={styles.sectionTitle}>关注中的话题</Text>
+      <SectionLabel title="关注中的话题" />
       {topics.map(topic => <View key={topic.id}>
         <View style={styles.appointment}>
           <View style={styles.appointmentText}>
@@ -177,7 +202,7 @@ export function InboxScreen({ onUnreadChange }: { onUnreadChange: (count: number
       </View>)}
     </View> : null}
     {appointments.length ? <View style={styles.upcoming}>
-      <Text style={styles.sectionTitle}>待到期约定</Text>
+      <SectionLabel title="待到期约定" />
       {appointments.map(item => <View key={item.id} style={styles.appointment}>
         <View style={styles.appointmentText}>
           <Text style={styles.body}>{item.title}</Text>
@@ -192,7 +217,8 @@ export function InboxScreen({ onUnreadChange }: { onUnreadChange: (count: number
         <Text style={styles.state}>{item.state === "unread" ? "未读" : item.state === "snoozed" ?
           `稍后 · ${item.snoozedUntil ? new Date(item.snoozedUntil).toLocaleDateString("zh-CN", { timeZone: timezone }) : ""}` :
           item.state === "handled" ? "已处理" : "已读"}</Text>
-        <Text style={styles.body}>{item.body}</Text>
+        <View style={styles.itemMeta}><Text style={styles.sourceLabel}>{item.sourceKind === "followup_topic" ? "主动跟进" : "一次性约定"}</Text>
+          <Text style={styles.body}>{item.body}</Text></View>
         <Text style={styles.time}>{new Date(item.scheduledAt).toLocaleDateString("zh-CN")}</Text>
         <View style={styles.actions}>
           {item.state === "unread" ? <Action label="标记已读" icon={Check} variant="quiet"
@@ -226,14 +252,21 @@ export function InboxScreen({ onUnreadChange }: { onUnreadChange: (count: number
 }
 
 const styles = StyleSheet.create({
-  item: { paddingVertical: 12, gap: 9 }, state: { color: colors.primary, fontSize: 13, fontWeight: "700" },
+  hero: { marginBottom: 22, padding: 18, minHeight: 150 },
+  heroEyebrow: { color: colors.primarySoft, fontSize: 10, letterSpacing: 0.8, fontWeight: "800" },
+  heroTitle: { color: colors.onPrimary, fontSize: 23, lineHeight: 26, fontWeight: "800", letterSpacing: -0.6, marginTop: 16 },
+  heroDetail: { color: colors.onPrimaryMuted, fontSize: 12, lineHeight: 18, marginTop: 10, maxWidth: 280 },
+  item: { padding: 16, gap: 9, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 18, marginBottom: 10 },
+  state: { color: colors.attention, fontSize: 11, fontWeight: "800", letterSpacing: 0.3 },
+  itemMeta: { gap: 6 },
+  sourceLabel: { color: colors.primary, fontSize: 11, fontWeight: "800" },
   body: { color: colors.ink, fontSize: 16, lineHeight: 25 },
   time: { color: colors.muted, fontSize: 13 },
   actions: { flexDirection: "row", gap: 8, flexWrap: "wrap", marginTop: 6 },
   snooze: { paddingTop: 12 },
   upcoming: { marginBottom: 24, gap: 8 },
-  sectionTitle: { color: colors.ink, fontSize: 16, fontWeight: "700" },
-  appointment: { paddingVertical: 12, borderBottomColor: colors.line, borderBottomWidth: 1,
+  sectionTitle: { color: colors.ink, fontSize: 16, fontWeight: "800" },
+  appointment: { padding: 14, borderWidth: 1, borderColor: colors.line, borderRadius: 16, backgroundColor: colors.surface,
     flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 10 },
   appointmentText: { flex: 1, minWidth: 200, gap: 4 },
   topicForm: { paddingVertical: 16 },

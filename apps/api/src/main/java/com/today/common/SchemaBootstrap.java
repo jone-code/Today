@@ -27,6 +27,12 @@ public class SchemaBootstrap {
     "db/migration-memory-embedding.sql",
     "db/migration-todo-punch.sql",
     "db/migration-memory-manage.sql",
+    "db/migration-memory-context-scope.sql",
+    "db/migration-privacy-audit.sql",
+    "db/migration-privacy-settings-audit.sql",
+    "db/migration-data-requests.sql",
+    "db/migration-data-request-queue.sql",
+    "db/migration-data-request-steps.sql",
     "db/migration-proactive-events.sql",
     "db/migration-checkin-ai-jobs.sql",
     "db/migration-ai-call-logs.sql",
@@ -38,7 +44,13 @@ public class SchemaBootstrap {
     "db/migration-punch-photo-cleanup.sql",
     "db/migration-agent-media-cleanup.sql",
     "db/migration-feedback-reports.sql",
-    "db/migration-agent-action-undo.sql"
+    "db/migration-agent-action-undo.sql",
+    "db/migration-product-events.sql",
+    "db/migration-product-events-schema.sql",
+    "db/migration-product-events-idempotency.sql",
+    "db/migration-metrics-access-audit.sql",
+    "db/migration-weekly-reviews.sql",
+    "db/migration-voice-transcription.sql"
   };
 
   private static final String[] REQUIRED = {
@@ -70,10 +82,20 @@ public class SchemaBootstrap {
     "api_rate_limits",
     "create_requests",
     "punch_photo_cleanup_jobs",
-    "feedback_reports"
+    "feedback_reports",
+    "product_events",
+    "weekly_reviews",
+    "voice_transcription_jobs"
+    ,"user_privacy_settings"
+    ,"memory_access_audit"
+    ,"privacy_settings_audit"
+    ,"metrics_access_audit"
+    ,"data_requests"
   };
 
   private static final String[] REQUIRED_COLUMNS = {
+    "data_requests:step",
+    "data_requests:download_token_expires_at",
     "conversations:deleted_at",
     "conversations:client_request_id",
     "conversation_messages:deleted_at",
@@ -85,6 +107,8 @@ public class SchemaBootstrap {
     "agent_action_logs:undo_snapshot_json",
     "agent_action_logs:undone_at",
     "memory_sources:active",
+    "memories:chat_context_scope",
+    "user_privacy_settings:chat_memory_enabled",
     "vector_sync_jobs:version",
     "vector_sync_jobs:lease_until",
     "checkin_memory_candidates:source_hash",
@@ -96,7 +120,13 @@ public class SchemaBootstrap {
     "agent_media:next_cleanup_at",
     "create_requests:request_hash",
     "create_requests:response_json",
-    "feedback_reports:deleted_at"
+    "feedback_reports:deleted_at",
+    "voice_transcription_jobs:client_request_id",
+    "voice_transcription_jobs:payload_hash",
+    "voice_transcription_jobs:media_path",
+    "product_events:received_at",
+    "product_events:platform",
+    "product_events:event_schema_version"
   };
 
   private static final String[] REQUIRED_UNIQUE_INDEXES = {
@@ -108,13 +138,20 @@ public class SchemaBootstrap {
     "one_off_appointments:uk_one_off_proposal",
     "inbox_items:uk_inbox_source_schedule",
     "api_rate_limits:PRIMARY",
-    "create_requests:uk_create_request"
+    "create_requests:uk_create_request",
+    "product_events:uk_product_events_request",
+    "voice_transcription_jobs:uk_voice_transcription_request"
   };
 
   private static final String[] REQUIRED_INDEXES = {
     "punch_logs:idx_punch_logs_user_photo",
     "agent_media:idx_agent_media_cleanup_due",
-    "feedback_reports:idx_feedback_owner"
+    "feedback_reports:idx_feedback_owner",
+    "product_events:idx_product_events_user_time",
+    "voice_transcription_jobs:idx_voice_transcription_status"
+    ,"memory_access_audit:idx_memory_audit_user_time"
+    ,"privacy_settings_audit:idx_privacy_audit_user_time"
+    ,"metrics_access_audit:idx_metrics_audit_accessed"
   };
 
   private final DataSource dataSource;

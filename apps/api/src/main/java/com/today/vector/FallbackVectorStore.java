@@ -52,6 +52,9 @@ public class FallbackVectorStore implements VectorStore {
   }
 
   @Override
+  public void deleteStrict(String memoryId) { primary.deleteStrict(memoryId); fallback.deleteStrict(memoryId); }
+
+  @Override
   public void setArchived(String memoryId, String userId, boolean archived) {
     try {
       primary.setArchived(memoryId, userId, archived);

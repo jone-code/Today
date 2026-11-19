@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
@@ -14,6 +15,19 @@ jobs:
   api:
     name: API (Maven test)
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: today
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_USER: today
+          MYSQL_PASSWORD: today
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -utoday -ptoday"
+          --health-interval=10s --health-timeout=5s --health-retries=12
     defaults:
       run:
         working-directory: apps/api
@@ -24,8 +38,173 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: maven
-      - name: Run tests
-        run: mvn -B test
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run tests with MySQL and mock vector service
+        env:
+          SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: "4"
+          TODAY_TEST_MYSQL_URL: jdbc:mysql://localhost:3306/today?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+          TODAY_TEST_MOCK_QDRANT_URL: http://127.0.0.1:6339
+        run: |
+          node ../../scripts/mock-qdrant.mjs > /tmp/today-mock-qdrant.log 2>&1 &
+          mock_pid=$!
+          trap 'kill "$mock_pid"' EXIT
+          mvn -B test
+      - name: Verify product event provenance schema
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          for column in received_at platform event_schema_version; do
+            count=$(mysql -N -B -h127.0.0.1 -P3306 -uroot -proot today \
+              -e "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='today' AND table_name='product_events' AND column_name='$column';")
+            test "$count" = "1"
+          done
+          mysql -N -B -h127.0.0.1 -P3306 -uroot -proot today \
+            -e "SELECT COUNT(*) FROM product_events WHERE received_at IS NULL;" | grep -qx '0'
+      - name: Verify privacy and metrics audit schema
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          for table in privacy_settings_audit metrics_access_audit; do
+            count=$(mysql -N -B -h127.0.0.1 -P3306 -uroot -proot today \
+              -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='today' AND table_name='$table';")
+            test "$count" = "1"
+          done
+          for index in idx_privacy_audit_user_time idx_metrics_audit_accessed; do
+            count=$(mysql -N -B -h127.0.0.1 -P3306 -uroot -proot today \
+              -e "SELECT COUNT(DISTINCT index_name) FROM information_schema.statistics WHERE table_schema='today' AND index_name='$index';")
+            test "$count" = "1"
+          done
+      - name: Verify backup can be restored into an isolated database
+        working-directory: ${{ github.workspace }}
+        env:
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PORT: "3306"
+          MYSQL_USER: root
+          MYSQL_PASSWORD: root
+          MYSQL_DATABASE: today
+        run: |
+          set -euo pipefail
+          backup="$RUNNER_TEMP/today-ci.sql.gz"
+          restore_db=today_ci_restore
+          npm run db:backup -- "$backup"
+          mysql -h127.0.0.1 -P3306 -uroot -proot -e "DROP DATABASE IF EXISTS \`$restore_db\`; CREATE DATABASE \`$restore_db\`;"
+          gzip -dc "$backup" | mysql -h127.0.0.1 -P3306 -uroot -proot "$restore_db"
+          tables=$(mysql -N -B -h127.0.0.1 -P3306 -uroot -proot "$restore_db" -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$restore_db';")
+          test "$tables" -gt 0
+
+  lifecycle-e2e:
+    name: API lifecycle E2E (MySQL 8.4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: today
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_USER: today
+          MYSQL_PASSWORD: today
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -utoday -ptoday"
+          --health-interval=10s --health-timeout=5s --health-retries=12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install workspace dependencies
+        run: npm ci
+      - name: Build API
+        working-directory: apps/api
+        run: mvn -B -q package -DskipTests
+      - name: Start isolated API
+        env:
+          MYSQL_URL: jdbc:mysql://127.0.0.1:3306/today?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8
+          MYSQL_USER: today
+          MYSQL_PASSWORD: today
+          TODAY_INTERNAL_EMAIL_ALLOWLIST: lifecycle-${{ github.run_id }}-${{ github.run_attempt }}@example.com
+          TODAY_JWT_SECRET: ci-lifecycle-jwt-secret-012345678901234567890123456789
+          TODAY_DATA_EXPORT_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          TODAY_METRICS_ADMIN_TOKEN: ci-lifecycle-metrics-token-012345678901234567890
+          TODAY_DATA_EXPORT_ENABLED: "true"
+          TODAY_ACCOUNT_DELETE_ENABLED: "true"
+          TODAY_AI_ASYNC_CHECKIN: "false"
+          TODAY_VECTOR_PROVIDER: mysql
+          TODAY_MEDIA_ROOT: ${{ runner.temp }}/today-lifecycle-media
+        run: |
+          set -euo pipefail
+          mkdir -p "$TODAY_MEDIA_ROOT"
+          java -jar apps/api/target/today-api-0.1.0.jar > "$RUNNER_TEMP/today-api-lifecycle.log" 2>&1 &
+          api_pid=$!
+          trap 'kill "$api_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3001/health/ready >/dev/null; then break; fi
+            if [ "$attempt" = "60" ]; then cat "$RUNNER_TEMP/today-api-lifecycle.log"; exit 1; fi
+            sleep 2
+          done
+          TODAY_E2E_API_URL=http://127.0.0.1:3001 \
+          TODAY_METRICS_ADMIN_TOKEN=ci-lifecycle-metrics-token-012345678901234567890 \
+          npm run e2e:metrics
+          for endpoint in activation retention quality; do
+            count=$(mysql -N -B -h127.0.0.1 -P3306 -uroot -proot today \
+              -e "SELECT COUNT(*) FROM metrics_access_audit WHERE endpoint='$endpoint';")
+            test "$count" -ge 1
+          done
+          TODAY_E2E_API_URL=http://127.0.0.1:3001 \
+          TODAY_E2E_LIFECYCLE_EMAIL="lifecycle-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@example.com" \
+          TODAY_E2E_LIFECYCLE_PASSWORD=ci-lifecycle-password-123 \
+          TODAY_E2E_EXPORT_PATH="$RUNNER_TEMP/today-lifecycle-export.zip" \
+          npm run e2e:data
+      - name: Verify lifecycle export manifest and checksums
+        run: |
+          python3 - "$RUNNER_TEMP/today-lifecycle-export.zip" <<'PY'
+          import hashlib
+          import json
+          import sys
+          import zipfile
+
+          archive_path = sys.argv[1]
+          with zipfile.ZipFile(archive_path) as archive:
+              names = set(archive.namelist())
+              assert "manifest.json" in names
+              assert "privacy_settings_audit.json" in names
+              assert not any("metrics_access_audit" in name for name in names)
+              privacy_audit = json.loads(archive.read("privacy_settings_audit.json"))
+              assert any(row.get("field") == "chat_memory_enabled"
+                         and row.get("new_value") == "false" for row in privacy_audit)
+              manifest = json.loads(archive.read("manifest.json"))
+              assert manifest.get("schemaVersion") == 1
+              entries = manifest.get("tables", []) + manifest.get("media", [])
+              assert entries
+              for entry in manifest.get("tables", []):
+                  name = entry["file"]
+                  assert name in names
+                  digest = hashlib.sha256(archive.read(name)).hexdigest()
+                  assert digest == entry["sha256"], name
+              for entry in manifest.get("media", []):
+                  name = entry["file"]
+                  assert name in names
+                  digest = hashlib.sha256(archive.read(name)).hexdigest()
+                  assert digest == entry["sha256"], name
+          print(f"verified export manifest entries: {len(entries)}")
+      - name: Upload lifecycle API log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lifecycle-api-log-${{ github.run_id }}
+          path: ${{ runner.temp }}/today-api-lifecycle.log
+          if-no-files-found: warn
+          retention-days: 7
 
   web:
     name: Web (lint + build)
@@ -47,6 +226,171 @@ jobs:
           NEXT_PUBLIC_API_BASE_URL: /api
           API_PROXY_TARGET: http://127.0.0.1:3001
         run: npm run build
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run metrics dashboard browser test
+        env:
+          NEXT_PUBLIC_API_BASE_URL: /api
+          API_PROXY_TARGET: http://127.0.0.1:3001
+        run: |
+          set -euo pipefail
+          npm run start -w @today/web > "$RUNNER_TEMP/today-web.log" 2>&1 &
+          web_pid=$!
+          trap 'kill "$web_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/admin/metrics >/dev/null; then break; fi
+            if [ "$attempt" = "30" ]; then cat "$RUNNER_TEMP/today-web.log"; exit 1; fi
+            sleep 1
+          done
+          npx playwright test e2e/metrics.spec.ts e2e/memory.spec.ts
+      - name: Upload web browser test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-browser-test-log-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/today-web.log
+            test-results
+          if-no-files-found: warn
+          retention-days: 7
+
+  mobile:
+    name: Mobile (types, tests, Android and iOS bundles)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck:contracts
+      - run: npm run typecheck:mobile
+      - run: npm test -w @today/mobile
+      - name: Verify Expo dependencies match SDK 53
+        working-directory: apps/mobile
+        run: npx expo install --check
+      - name: Verify mobile event version matches app config
+        working-directory: apps/mobile
+        run: |
+          app_version=$(node -p 'require("./app.json").expo.version')
+          grep -q "const mobileAppVersion = \"$app_version\";" src/api.ts
+      - name: Resolve Expo native configuration
+        working-directory: apps/mobile
+        run: |
+          npx expo config --json > "$RUNNER_TEMP/today-expo-config.json"
+          node -e 'const x=require(process.env.RUNNER_TEMP+"/today-expo-config.json"); if (x.runtimeVersion?.policy !== "appVersion" || !x.icon || !x.ios?.infoPlist?.NSMicrophoneUsageDescription || !x.android?.package) process.exit(1)'
+      - name: Validate EAS build profiles
+        working-directory: apps/mobile
+        run: |
+          node -e 'const x=require("./eas.json"); const app=require("./app.json").expo; if (x.build.preview.android.buildType !== "apk" || x.build.preview.channel !== "preview" || x.build.production.distribution !== "store" || x.build.production.channel !== "production" || app.runtimeVersion?.policy !== "appVersion") process.exit(1)'
+      - name: Reject deprecated Expo AV imports
+        run: |
+          if rg -n 'expo-av' apps/mobile/package.json apps/mobile/src; then
+            echo "expo-av is deprecated for this SDK; use expo-audio"
+            exit 1
+          fi
+      - name: Verify native audio permissions
+        working-directory: apps/mobile
+        run: |
+          npx expo prebuild --clean --no-install
+          grep -q 'android.permission.RECORD_AUDIO' android/app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.MODIFY_AUDIO_SETTINGS' android/app/src/main/AndroidManifest.xml
+          grep -q 'NSMicrophoneUsageDescription' ios/Today/Info.plist
+          test -s assets/todaylogo.png
+          test -n "$(find android/app/src/main/res -type f -name 'ic_launcher*' -print -quit)"
+      - name: Export Android and iOS
+        working-directory: apps/mobile
+        run: npx expo export --platform android --platform ios --output-dir dist
+      - name: Upload Expo bundles for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-expo-bundles-${{ github.run_id }}
+          path: apps/mobile/dist
+          if-no-files-found: warn
+          retention-days: 7
+
+  mobile-android-build:
+    name: Mobile Android native build (debug)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - run: npm ci
+      - name: Generate Android native project
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform android --clean --no-install
+      - name: Compile Android debug APK
+        working-directory: apps/mobile/android
+        run: ./gradlew :app:assembleDebug -PreactNativeArchitectures=arm64-v8a,x86_64 --no-daemon --console=plain
+      - name: Upload debug APK for device testing with Metro
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-android-debug-${{ github.run_id }}
+          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
+
+  mobile-native-config:
+    name: Mobile iOS simulator build (macOS)
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Generate native projects
+        working-directory: apps/mobile
+        run: npx expo prebuild --clean --no-install
+      - name: Install iOS native dependencies
+        working-directory: apps/mobile/ios
+        run: pod install --no-repo-update
+      - name: Compile iOS simulator app without distribution signing
+        working-directory: apps/mobile/ios
+        run: |
+          set -euo pipefail
+          xcodebuild -workspace Today.xcworkspace -scheme Today \
+            -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/today-ios-build" \
+            CODE_SIGNING_ALLOWED=NO build 2>&1 | tee "$RUNNER_TEMP/today-ios-build.log"
+          test -d "$RUNNER_TEMP/today-ios-build/Build/Products/Debug-iphonesimulator/Today.app"
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$RUNNER_TEMP/today-ios-build/Build/Products/Debug-iphonesimulator/Today.app" \
+            "$RUNNER_TEMP/today-ios-simulator.zip"
+      - name: Upload simulator app for testing with Metro
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-ios-simulator-${{ github.run_id }}
+          path: ${{ runner.temp }}/today-ios-simulator.zip
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload generated native configuration
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-native-config-${{ github.run_id }}
+          path: |
+            apps/mobile/ios/Podfile.lock
+            apps/mobile/ios/Today/Info.plist
+            apps/mobile/android/app/src/main/AndroidManifest.xml
+            ${{ runner.temp }}/today-ios-build.log
+          if-no-files-found: warn
+          retention-days: 7
 
   docker:
     name: Docker images
@@ -76,3 +420,66 @@ jobs:
             API_PROXY_TARGET=http://today-api:3001
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  release-config:
+    name: Release configuration checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check operational readiness script syntax
+        run: |
+          node --check scripts/check-ops-readiness.mjs
+          node --check scripts/build-trial-report.mjs
+          node --check scripts/test-trial-report.mjs
+      - name: Verify trial report decisions and reconciliation fields
+        run: npm run test:trial-report
+      - name: Verify release configuration scenarios
+        run: npm run test:release-check
+      - name: Verify operational warning thresholds
+        run: npm run test:ops-check
+      - name: Verify backup permissions and failure cleanup
+        run: npm run test:db-backup
+      - name: Validate complete internal trial configuration
+        env:
+          TODAY_INTERNAL_EMAIL_ALLOWLIST: trial@example.com
+          TODAY_JWT_SECRET: ci-jwt-secret-012345678901234567890123456789
+          TODAY_METRICS_ADMIN_TOKEN: ci-metrics-token-012345678901234567890
+          TODAY_DATA_EXPORT_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          TODAY_PUBLIC_API_URL: https://today.example.com
+          TODAY_VOICE_PER_HOUR: "20"
+          TODAY_VOICE_PER_DAY: "100"
+          TODAY_METRICS_AUDIT_RETAIN_DAYS: "180"
+          TODAY_DATA_EXPORT_ENABLED: "true"
+          TODAY_ACCOUNT_DELETE_ENABLED: "true"
+        run: npm run release:check
+      - name: Verify Compose passes audit retention configuration
+        env:
+          TODAY_METRICS_AUDIT_RETAIN_DAYS: "240"
+        run: |
+          set -euo pipefail
+          docker compose config --format json | node -e '
+            const fs = require("node:fs");
+            const assert = require("node:assert/strict");
+            const config = JSON.parse(fs.readFileSync(0, "utf8"));
+            assert.equal(String(config.services.api.environment.TODAY_METRICS_AUDIT_RETAIN_DAYS), "240");
+            console.log("Compose API audit retention override verified");
+          '
+      - name: Reject invalid voice limit relationship
+        env:
+          TODAY_INTERNAL_EMAIL_ALLOWLIST: trial@example.com
+          TODAY_JWT_SECRET: ci-jwt-secret-012345678901234567890123456789
+          TODAY_METRICS_ADMIN_TOKEN: ci-metrics-token-012345678901234567890
+          TODAY_DATA_EXPORT_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          TODAY_PUBLIC_API_URL: https://today.example.com
+          TODAY_VOICE_PER_HOUR: "101"
+          TODAY_VOICE_PER_DAY: "100"
+          TODAY_DATA_EXPORT_ENABLED: "true"
+          TODAY_ACCOUNT_DELETE_ENABLED: "true"
+        run: |
+          if npm run release:check; then
+            echo "release:check unexpectedly accepted invalid voice limits"
+            exit 1
+          fi

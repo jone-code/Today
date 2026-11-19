@@ -5,6 +5,7 @@ import com.today.vector.VectorReindexService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -33,9 +34,19 @@ public class MemoryController {
   @GetMapping("/v1/memories/{id}/origins")
   public List<MemoryOriginDto> origins(@PathVariable String id) { return memories.origins(id); }
 
+  @GetMapping("/v1/memories/{id}/access-audit")
+  public List<MemoryAccessAuditDto> accessAudit(@PathVariable String id,
+      @RequestParam(name = "limit", defaultValue = "20") int limit) { return memories.accessAudit(id, limit); }
+
   @PutMapping("/v1/memories/{id}")
   public MemoryDto update(@PathVariable String id, @Valid @RequestBody MemoryUpdateRequest body) {
     return memories.update(id, body);
+  }
+
+  @PatchMapping("/v1/memories/{id}/context-scope")
+  public MemoryDto updateContextScope(@PathVariable String id,
+      @Valid @RequestBody MemoryContextScopeRequest body) {
+    return memories.updateChatContextScope(id, body.getScope(), body.getExpectedUpdatedAt());
   }
 
   @PostMapping("/v1/memories/{id}/archive")

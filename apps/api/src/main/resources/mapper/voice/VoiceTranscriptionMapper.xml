@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.today.voice.VoiceTranscriptionMapper">
+  <resultMap id="JobMap" type="com.today.voice.VoiceTranscriptionJobEntity">
+    <id property="id" column="id"/><result property="userId" column="user_id"/><result property="clientRequestId" column="client_request_id"/>
+    <result property="status" column="status"/><result property="contentType" column="content_type"/><result property="durationMs" column="duration_ms"/><result property="payloadHash" column="payload_hash"/><result property="mediaPath" column="media_path"/>
+    <result property="transcript" column="transcript"/><result property="errorCode" column="error_code"/><result property="attempts" column="attempts"/>
+    <result property="expiresAt" column="expires_at"/><result property="createdAt" column="created_at"/><result property="updatedAt" column="updated_at"/><result property="completedAt" column="completed_at"/>
+  </resultMap>
+  <select id="findByClientRequestId" resultMap="JobMap">SELECT * FROM voice_transcription_jobs WHERE user_id=#{userId} AND client_request_id=#{clientRequestId} LIMIT 1</select>
+  <select id="findOwnedById" resultMap="JobMap">SELECT * FROM voice_transcription_jobs WHERE user_id=#{userId} AND id=#{id} LIMIT 1</select>
+  <insert id="insert">INSERT INTO voice_transcription_jobs (id,user_id,client_request_id,status,content_type,duration_ms,payload_hash,media_path,transcript,error_code,attempts,expires_at,created_at,updated_at,completed_at) VALUES (#{id},#{userId},#{clientRequestId},#{status},#{contentType},#{durationMs},#{payloadHash},#{mediaPath},#{transcript},#{errorCode},#{attempts},#{expiresAt},#{createdAt},#{updatedAt},#{completedAt})</insert>
+  <update id="markRetrying">UPDATE voice_transcription_jobs SET status='transcribing', attempts=attempts+1, error_code=NULL, updated_at=#{now}, completed_at=NULL WHERE user_id=#{userId} AND id=#{id} AND status IN ('failed','expired')</update>
+  <update id="updateOutcome">UPDATE voice_transcription_jobs SET status=#{status}, transcript=#{transcript}, error_code=#{errorCode}, media_path=#{mediaPath}, completed_at=#{completedAt}, updated_at=#{updatedAt} WHERE user_id=#{userId} AND id=#{id} AND status='transcribing'</update>
+  <update id="markExpired">UPDATE voice_transcription_jobs SET status='expired', error_code=COALESCE(error_code, 'expired'), updated_at=#{now} WHERE status='failed' AND expires_at&lt;=#{now}</update>
+  <select id="findExpiredWithMedia" resultMap="JobMap">SELECT * FROM voice_transcription_jobs WHERE media_path IS NOT NULL AND expires_at&lt;=#{now} AND status IN ('failed','expired','succeeded') ORDER BY expires_at LIMIT #{limit}</select>
+  <update id="clearMediaPath">UPDATE voice_transcription_jobs SET media_path=NULL, updated_at=UTC_TIMESTAMP(3) WHERE id=#{id}</update>
+</mapper>

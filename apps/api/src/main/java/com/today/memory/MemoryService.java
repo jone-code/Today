@@ -7,6 +7,7 @@ import com.today.common.EntityMapper;
 import com.today.common.JsonUtils;
 import com.today.common.MemoryCategory;
 import com.today.identity.IdentityService;
+import com.today.privacy.PrivacySettingsService;
 import com.today.persistence.MemoryEntity;
 import com.today.persistence.MemorySourceEntity;
 import com.today.vector.ScoredMemoryId;
@@ -17,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +26,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class MemoryService {
+
+  public static final String CHAT_AND_TIMELINE = "chat_and_timeline";
+  public static final String TIMELINE_ONLY = "timeline_only";
+  public static final String DISABLED = "disabled";
 
   private static final TypeReference<MemoryExtractPayload> EXTRACT_TYPE =
       new TypeReference<>() {};
@@ -34,6 +40,8 @@ public class MemoryService {
   private final VectorStore vectorStore;
   private final MemorySourceMapper sourceMapper;
   private final VectorSyncJobMapper vectorJobs;
+  private final PrivacySettingsService privacy;
+  private final MemoryAccessAuditMapper audit;
 
   public MemoryService(
       MemoryMapper memoryMapper,
@@ -42,12 +50,22 @@ public class MemoryService {
       VectorStore vectorStore,
       MemorySourceMapper sourceMapper,
       VectorSyncJobMapper vectorJobs) {
+    this(memoryMapper, aiGateway, identity, vectorStore, sourceMapper, vectorJobs, null, null);
+  }
+
+  @org.springframework.beans.factory.annotation.Autowired
+  public MemoryService(
+      MemoryMapper memoryMapper, AiGatewayService aiGateway, IdentityService identity,
+      VectorStore vectorStore, MemorySourceMapper sourceMapper, VectorSyncJobMapper vectorJobs,
+      PrivacySettingsService privacy, MemoryAccessAuditMapper audit) {
     this.memoryMapper = memoryMapper;
     this.aiGateway = aiGateway;
     this.identity = identity;
     this.vectorStore = vectorStore;
     this.sourceMapper = sourceMapper;
     this.vectorJobs = vectorJobs;
+    this.privacy = privacy;
+    this.audit = audit;
   }
 
   public List<MemoryDto> list(boolean includeArchived) {
@@ -71,9 +89,18 @@ public class MemoryService {
         .toList();
   }
 
+  public List<MemoryAccessAuditDto> accessAudit(String id, int limit) {
+    requireOwned(id);
+    return audit == null ? List.of() : audit.list(identity.getCurrentUserId(), id, Math.min(50, Math.max(1, limit)));
+  }
+
   /** Legacy memories without a live, confirmed source are not injected into conversation prompts. */
   public List<Map<String, String>> confirmedForConversation(int limit) {
-    return memoryMapper.listConfirmedForAgent(identity.getCurrentUserId(), Math.min(10, Math.max(1, limit)))
+    String userId = identity.getCurrentUserId();
+    if (privacy != null && !privacy.chatMemoryEnabled(userId)) return List.of();
+    List<MemoryEntity> selected = memoryMapper.listConfirmedForAgent(userId, Math.min(10, Math.max(1, limit)));
+    recordAudit(selected, userId, "retrieved", "chat");
+    return selected
         .stream()
         .map(memory -> Map.of("category", memory.getCategory(), "text", memory.getMemoryText()))
         .toList();
@@ -82,6 +109,7 @@ public class MemoryService {
   /** 按 query 检索最相关记忆（默认排除已归档） */
   public List<MemoryDto> retrieveRelevant(String queryText, int topK) {
     String userId = identity.getCurrentUserId();
+    if (privacy != null && !privacy.chatMemoryEnabled(userId)) return List.of();
     int limit = Math.max(1, topK);
     List<MemoryEntity> confirmed = memoryMapper.listConfirmedForAgent(userId, limit);
     if (confirmed.isEmpty()) {
@@ -103,17 +131,28 @@ public class MemoryService {
           out.add(EntityMapper.toDto(entity));
         }
         if (!out.isEmpty()) {
+          recordAudit(out.stream().map(dto -> memoryMapper.findConfirmedById(dto.id(), userId)).toList(), userId, "retrieved", "vector");
           return out;
         }
       }
     }
 
+    recordAudit(confirmed, userId, "retrieved", "fallback");
     return confirmed.stream().map(EntityMapper::toDto).toList();
+  }
+
+  private void recordAudit(List<MemoryEntity> rows, String userId, String action, String source) {
+    if (audit == null) return;
+    for (MemoryEntity row : rows) if (row != null) {
+      audit.insert(java.util.UUID.randomUUID().toString(), userId, row.getId(), action, source,
+          null, EntityMapper.now(), "{\"policyVersion\":1}");
+    }
   }
 
   @Transactional
   public MemoryDto update(String id, MemoryUpdateRequest body) {
     MemoryEntity entity = requireOwned(id);
+    if (entity.getChatContextScope() == null) entity.setChatContextScope(CHAT_AND_TIMELINE);
     boolean textChanged = false;
     if (body.getText() != null) {
       String text = body.getText().trim();
@@ -137,6 +176,39 @@ public class MemoryService {
     } else {
       memoryMapper.update(entity);
     }
+    enqueueVectorSync(entity);
+    return EntityMapper.toDto(requireOwned(id));
+  }
+
+  @Transactional
+  public MemoryDto updateChatContextScope(String id, String scope) {
+    return updateChatContextScope(id, scope, null);
+  }
+
+  @Transactional
+  public MemoryDto updateChatContextScope(String id, String scope, String expectedUpdatedAt) {
+    if (!Set.of(CHAT_AND_TIMELINE, TIMELINE_ONLY, DISABLED).contains(scope)) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid memory context scope");
+    }
+    MemoryEntity entity = requireOwned(id);
+    Instant now = EntityMapper.now();
+    int changed;
+    if (expectedUpdatedAt == null || expectedUpdatedAt.isBlank()) {
+      changed = memoryMapper.updateChatContextScope(id, identity.getCurrentUserId(), scope, now);
+    } else {
+      Instant expected;
+      try { expected = Instant.parse(expectedUpdatedAt); }
+      catch (java.time.format.DateTimeParseException e) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid memory version");
+      }
+      changed = memoryMapper.updateChatContextScopeIfCurrent(id, identity.getCurrentUserId(), scope, now, expected);
+    }
+    if (changed != 1) {
+      throw new ResponseStatusException(expectedUpdatedAt == null ? HttpStatus.NOT_FOUND : HttpStatus.CONFLICT,
+          expectedUpdatedAt == null ? "memory not found" : "memory changed; reload and retry");
+    }
+    entity.setChatContextScope(scope);
+    entity.setUpdatedAt(now);
     enqueueVectorSync(entity);
     return EntityMapper.toDto(requireOwned(id));
   }
@@ -193,6 +265,7 @@ public class MemoryService {
     entity.setMemoryText(normalized);
     entity.setStrength(1);
     entity.setArchived(false);
+    entity.setChatContextScope(CHAT_AND_TIMELINE);
     entity.setUpdatedAt(now);
     memoryMapper.insert(entity);
     MemorySourceEntity source = new MemorySourceEntity();

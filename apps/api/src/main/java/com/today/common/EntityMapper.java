@@ -46,6 +46,7 @@ public final class EntityMapper {
         entity.getMemoryText(),
         entity.getStrength(),
         entity.isArchived(),
+        entity.getChatContextScope() == null ? "chat_and_timeline" : entity.getChatContextScope(),
         entity.getUpdatedAt().toString());
   }
 

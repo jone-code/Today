@@ -57,6 +57,7 @@ export const AgentProposalSchema = z.object({
   status: z.string(),
   sourceMessageId: z.string(),
   createdAt: z.string().datetime(),
+  expiresAt: z.string().datetime().nullable().optional(),
 });
 export type AgentProposal = z.infer<typeof AgentProposalSchema>;
 

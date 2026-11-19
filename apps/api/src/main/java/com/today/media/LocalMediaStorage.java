@@ -32,6 +32,8 @@ public class LocalMediaStorage {
 
   private static final Set<String> ALLOWED_TYPES =
       Set.of("image/jpeg", "image/png", "image/webp", "image/gif");
+  private static final Set<String> ALLOWED_AUDIO_TYPES =
+      Set.of("audio/m4a", "audio/mp4", "audio/aac", "audio/wav", "audio/x-m4a");
   private static final int MAX_AVATAR_DIMENSION = 8192;
   private static final long MAX_AVATAR_PIXELS = 12_000_000L;
   private static final int OUTPUT_AVATAR_DIMENSION = 1024;
@@ -96,6 +98,34 @@ public class LocalMediaStorage {
       deleteIfPresent(relative);
       throw new ResponseStatusException(
           HttpStatus.INTERNAL_SERVER_ERROR, "failed to store photo: " + e.getMessage());
+    }
+  }
+
+  /** Store short-lived voice input; the transcription worker owns its cleanup. */
+  public String storeVoiceAudio(String userId, MultipartFile file) {
+    if (file == null || file.isEmpty()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "audio is required");
+    }
+    if (file.getSize() > properties.getMaxBytes()) {
+      throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "audio exceeds max size");
+    }
+    String contentType = normalizeContentType(file.getContentType());
+    if (!ALLOWED_AUDIO_TYPES.contains(contentType)) {
+      throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "unsupported audio type: " + contentType);
+    }
+    String safeUser = sanitizeSegment(userId);
+    String ext = extensionFor(contentType, file.getOriginalFilename());
+    String relative = "voice/" + safeUser + "/" + UUID.randomUUID() + "." + ext;
+    Path target = resolveSafe(relative);
+    try {
+      Files.createDirectories(target.getParent());
+      try (InputStream in = file.getInputStream()) {
+        Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
+      }
+      return relative;
+    } catch (IOException e) {
+      deleteIfPresent(relative);
+      throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "failed to store audio");
     }
   }
 
@@ -188,6 +218,19 @@ public class LocalMediaStorage {
     } catch (Exception e) {
       log.warn("failed to delete media {}: {}", relativePath, e.getMessage());
       return false;
+    }
+  }
+
+  public void deleteUserMedia(String userId) {
+    String safe = sanitizeSegment(userId);
+    for (String prefix : Set.of("agent/" + safe, "punch/" + safe, "voice/" + safe, "exports/" + safe)) {
+      Path directory = root.resolve(prefix).normalize();
+      if (!directory.startsWith(root) || !Files.exists(directory)) continue;
+      try (var paths = Files.walk(directory)) {
+        paths.sorted(java.util.Comparator.reverseOrder()).forEach(path -> {
+          try { Files.deleteIfExists(path); } catch (IOException e) { throw new java.io.UncheckedIOException(e); }
+        });
+      } catch (IOException e) { throw new java.io.UncheckedIOException(e); }
     }
   }
 

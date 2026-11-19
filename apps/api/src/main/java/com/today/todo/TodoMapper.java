@@ -2,6 +2,7 @@ package com.today.todo;
 
 import com.today.persistence.TodoEntity;
 import java.util.List;
+import java.time.LocalDate;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -16,6 +17,8 @@ public interface TodoMapper {
 
   List<TodoEntity> listByUserId(
       @Param("userId") String userId, @Param("status") String status);
+  List<TodoEntity> listCompletedByUserIdAndRange(@Param("userId") String userId,
+      @Param("from") LocalDate from, @Param("to") LocalDate to);
 
   int insert(TodoEntity entity);
 

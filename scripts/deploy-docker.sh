@@ -101,7 +101,7 @@ cmd_up() {
   fi
 
   log "waiting for health..."
-  wait_http "http://127.0.0.1:${API_PORT}/health/live" "api" 90
+  wait_http "http://127.0.0.1:${API_PORT}/health/ready" "api" 90
   wait_http "http://127.0.0.1:${WEB_PORT}/" "web" 60
 
   # Best-effort schema migrate for existing volumes
@@ -136,7 +136,7 @@ cmd_restart() {
   ensure_media_dir
   log "restarting stack..."
   "${COMPOSE[@]}" up -d --build
-  wait_http "http://127.0.0.1:${API_PORT}/health/live" "api" 90
+  wait_http "http://127.0.0.1:${API_PORT}/health/ready" "api" 90
   wait_http "http://127.0.0.1:${WEB_PORT}/" "web" 60
   cmd_status
 }
@@ -162,6 +162,9 @@ cmd_health() {
   need_cmd curl
   echo "== api /health/live =="
   curl -fsS "http://127.0.0.1:${API_PORT}/health/live" || true
+  echo
+  echo "== api /health/ready =="
+  curl -fsS "http://127.0.0.1:${API_PORT}/health/ready" || true
   echo
   echo "== api /health =="
   curl -fsS "http://127.0.0.1:${API_PORT}/health" || true

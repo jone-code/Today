@@ -35,7 +35,7 @@ class FollowupTopicUpdateDatabaseTest {
 
   @Test
   void editingUsesAccountTimezoneAndRejectsStaleOrForeignRequests() {
-    String user = "topic-edit-" + UUID.randomUUID();
+    String user = UUID.randomUUID().toString();
     String other = "topic-other-" + UUID.randomUUID();
     String conversation = UUID.randomUUID().toString();
     String id = UUID.randomUUID().toString();
@@ -43,6 +43,7 @@ class FollowupTopicUpdateDatabaseTest {
     LocalDate selected = LocalDate.now(zone).plusDays(3);
     when(identity.getCurrentUserId()).thenReturn(user);
     try {
+      jdbc.update("INSERT INTO users(id,email,display_name,password_hash,created_at,updated_at) VALUES(?,?,'test','test',UTC_TIMESTAMP(3),UTC_TIMESTAMP(3))", user, user + "@example.test");
       insertTopic(user, conversation, id, null);
       followups.updatePreferences(new FollowupPreferenceUpdateRequest(true, 1, 3, zone.getId()));
       FollowupTopicDto initial = followups.topics(10).get(0);
@@ -68,6 +69,9 @@ class FollowupTopicUpdateDatabaseTest {
           .getStatusCode().value());
     } finally {
       remove(user, conversation);
+      jdbc.update("DELETE FROM privacy_settings_audit WHERE user_id=?", user);
+      jdbc.update("DELETE FROM user_privacy_settings WHERE user_id=?", user);
+      jdbc.update("DELETE FROM users WHERE id=?", user);
     }
   }
 

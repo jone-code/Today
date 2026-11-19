@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.today.privacy.PrivacySettingsMapper">
+  <select id="lockUser" resultType="string">SELECT id FROM users WHERE id=#{userId} FOR UPDATE</select>
+  <select id="lockDeletionRequest" resultType="string">SELECT id FROM data_requests WHERE user_id=#{userId} AND type='delete_account' LIMIT 1 FOR UPDATE</select>
+  <resultMap id="Map" type="com.today.privacy.PrivacySettingsEntity">
+    <id property="userId" column="user_id"/><result property="chatMemoryEnabled" column="chat_memory_enabled"/>
+    <result property="voiceRetention" column="voice_retention"/><result property="followupEnabled" column="followup_enabled"/>
+    <result property="version" column="version"/><result property="updatedAt" column="updated_at"/>
+  </resultMap>
+  <select id="find" resultMap="Map">SELECT user_id, chat_memory_enabled, voice_retention, followup_enabled, version, updated_at FROM user_privacy_settings WHERE user_id=#{userId}</select>
+  <insert id="insert">INSERT INTO user_privacy_settings(user_id,chat_memory_enabled,voice_retention,followup_enabled,version,updated_at) VALUES(#{userId},#{chatMemoryEnabled},#{voiceRetention},#{followupEnabled},#{version},#{updatedAt}) ON DUPLICATE KEY UPDATE user_id=user_id</insert>
+  <update id="update">UPDATE user_privacy_settings SET chat_memory_enabled=#{chatMemoryEnabled}, voice_retention=#{voiceRetention}, followup_enabled=#{followupEnabled}, version=#{version}, updated_at=#{updatedAt} WHERE user_id=#{userId} AND version=#{version}-1</update>
+</mapper>

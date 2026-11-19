@@ -17,9 +17,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
   private final JwtService jwtService;
+  private final InternalAccountPolicy authService;
+  private final com.today.data.DataRequestService dataRequests;
   private final AuthUserDetailsService userDetailsService;
 
-  public JwtAuthFilter(JwtService jwtService, AuthUserDetailsService userDetailsService) {
+  public JwtAuthFilter(JwtService jwtService, AuthUserDetailsService userDetailsService, InternalAccountPolicy authService, com.today.data.DataRequestService dataRequests) {
+    this.authService = authService; this.dataRequests = dataRequests;
     this.jwtService = jwtService;
     this.userDetailsService = userDetailsService;
   }
@@ -39,6 +42,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
       try {
         Claims claims = jwtService.parse(token);
         AuthUserPrincipal principal = userDetailsService.loadById(claims.getSubject());
+        if (!authService.isAllowedInternalEmail(principal.getUsername())) {
+          response.sendError(403, "trial is limited to internal accounts"); return;
+        }
+        if (dataRequests.isDeleting(principal.getUserId()) && !request.getRequestURI().startsWith("/v1/data-requests")) {
+          response.sendError(403, "account deletion in progress"); return;
+        }
         UsernamePasswordAuthenticationToken auth =
             new UsernamePasswordAuthenticationToken(
                 principal, null, principal.getAuthorities());

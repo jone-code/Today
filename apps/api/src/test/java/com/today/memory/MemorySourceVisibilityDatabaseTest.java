@@ -29,6 +29,26 @@ class MemorySourceVisibilityDatabaseTest {
 
   @Test
   @Transactional
+  void contextScopeExcludesMemoryFromChatButPreservesOwnerManagement() {
+    String user = UUID.randomUUID().toString();
+    String memory = insertMemory(user);
+    String checkin = UUID.randomUUID().toString();
+    jdbc.update("INSERT INTO checkins (id,user_id,checkin_date,raw_text,created_at,updated_at) "
+        + "VALUES (?,?,CURRENT_DATE(),'record',NOW(3),NOW(3))", checkin, user);
+    source(memory, user, "checkin", checkin);
+    assertEquals("chat_and_timeline", memories.findConfirmedById(memory, user).getChatContextScope());
+    for (String scope : java.util.List.of("timeline_only", "disabled")) {
+      assertEquals(1, memories.updateChatContextScope(memory, user, scope, Instant.now()));
+      assertNull(memories.findConfirmedById(memory, user));
+      assertTrue(memories.listConfirmedForAgent(user, 10).isEmpty());
+      assertEquals(scope, memories.findVisibleById(memory, user).getChatContextScope());
+      assertEquals(0, memories.updateChatContextScope(memory, "other", "chat_and_timeline", Instant.now()));
+      assertNull(memories.findConfirmedById(memory, user));
+    }
+  }
+
+  @Test
+  @Transactional
   void onlyLiveOwnedSourcesAreVisibleAndAvailableToTheAgent() {
     String user = UUID.randomUUID().toString();
     String other = UUID.randomUUID().toString();

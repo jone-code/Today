@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.today.telemetry.ProductEventMapper">
+  <insert id="insert">
+    INSERT INTO product_events
+      (id, user_id, session_id, event_name, screen, entity_type, entity_id, properties_json,
+       occurred_at, received_at, platform, event_schema_version, client_request_id, app_version)
+    VALUES
+      (#{id}, #{userId}, #{sessionId}, #{eventName}, #{screen}, #{entityType}, #{entityId}, #{propertiesJson},
+       #{occurredAt}, #{receivedAt}, #{platform}, #{eventSchemaVersion}, #{clientRequestId}, #{appVersion})
+    ON DUPLICATE KEY UPDATE id = id
+  </insert>
+</mapper>

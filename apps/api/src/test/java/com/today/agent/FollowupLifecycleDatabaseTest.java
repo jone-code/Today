@@ -84,7 +84,7 @@ class FollowupLifecycleDatabaseTest {
 
   @Test
   void snoozeDateIsStoredAtNineInTheUsersConfiguredTimezone() {
-    String user = "followup-zone-" + UUID.randomUUID();
+    String user = UUID.randomUUID().toString();
     String conversation = UUID.randomUUID().toString();
     String topic = UUID.randomUUID().toString();
     String inbox = UUID.randomUUID().toString();
@@ -93,6 +93,7 @@ class FollowupLifecycleDatabaseTest {
     Instant expected = selected.atTime(9, 0).atZone(zone).toInstant();
     when(identity.getCurrentUserId()).thenReturn(user);
     try {
+      jdbc.update("INSERT INTO users(id,email,display_name,password_hash,created_at,updated_at) VALUES(?,?,'test','test',UTC_TIMESTAMP(3),UTC_TIMESTAMP(3))", user, user + "@example.test");
       insertConversationAndTopic(user, conversation, topic, 1, Instant.now().plus(Duration.ofDays(7)));
       insertInbox(user, topic, inbox, Instant.now(), "unread");
       followups.updatePreferences(new FollowupPreferenceUpdateRequest(true, 1, 3, zone.getId()));
@@ -105,6 +106,9 @@ class FollowupLifecycleDatabaseTest {
     } finally {
       remove(user, conversation);
       jdbc.update("DELETE FROM followup_preferences WHERE user_id = ?", user);
+      jdbc.update("DELETE FROM privacy_settings_audit WHERE user_id=?", user);
+      jdbc.update("DELETE FROM user_privacy_settings WHERE user_id=?", user);
+      jdbc.update("DELETE FROM users WHERE id=?", user);
     }
   }
 

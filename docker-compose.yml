@@ -74,6 +74,12 @@ services:
       TODAY_QDRANT_URL: http://qdrant:6333
       TODAY_QDRANT_COLLECTION: ${TODAY_QDRANT_COLLECTION:-today_memories}
       TODAY_VECTOR_ADMIN_TOKEN: ${TODAY_VECTOR_ADMIN_TOKEN:-}
+      TODAY_INTERNAL_EMAIL_ALLOWLIST: ${TODAY_INTERNAL_EMAIL_ALLOWLIST:-}
+      TODAY_METRICS_ADMIN_TOKEN: ${TODAY_METRICS_ADMIN_TOKEN:-}
+      TODAY_METRICS_AUDIT_RETAIN_DAYS: ${TODAY_METRICS_AUDIT_RETAIN_DAYS:-180}
+      TODAY_DATA_EXPORT_KEY: ${TODAY_DATA_EXPORT_KEY:-}
+      TODAY_DATA_EXPORT_ENABLED: ${TODAY_DATA_EXPORT_ENABLED:-true}
+      TODAY_ACCOUNT_DELETE_ENABLED: ${TODAY_ACCOUNT_DELETE_ENABLED:-true}
       TODAY_AI_ADMIN_TOKEN: ${TODAY_AI_ADMIN_TOKEN:-}
       TODAY_AI_ASYNC_CHECKIN: ${TODAY_AI_ASYNC_CHECKIN:-true}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
@@ -83,13 +89,15 @@ services:
       # Punch photos: container path (mount host dir below).
       TODAY_MEDIA_ROOT: ${TODAY_MEDIA_ROOT:-/data/media}
       TODAY_MEDIA_MAX_BYTES: ${TODAY_MEDIA_MAX_BYTES:-10485760}
+      TODAY_VOICE_PER_HOUR: ${TODAY_VOICE_PER_HOUR:-20}
+      TODAY_VOICE_PER_DAY: ${TODAY_VOICE_PER_DAY:-100}
     ports:
       - "${API_PORT:-3001}:3001"
     volumes:
       # Host path for punch photos → container TODAY_MEDIA_ROOT
       - ${TODAY_MEDIA_PATH:-./data/media}:/data/media
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3001/health/live"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3001/health/ready"]
       interval: 10s
       timeout: 5s
       retries: 18

@@ -10,6 +10,7 @@
     <result property="memoryText" column="memory_text"/>
     <result property="strength" column="strength"/>
     <result property="archived" column="archived"/>
+    <result property="chatContextScope" column="chat_context_scope"/>
     <result property="embeddingJson" column="embedding_json"/>
     <result property="updatedAt" column="updated_at"/>
   </resultMap>
@@ -26,14 +27,14 @@
   </sql>
 
   <select id="findById" resultMap="MemoryEntityMap">
-    SELECT id, user_id, category, memory_text, strength, archived, embedding_json, updated_at
+    SELECT id, user_id, category, memory_text, strength, archived, chat_context_scope, embedding_json, updated_at
     FROM memories
     WHERE id = #{id}
     LIMIT 1
   </select>
 
   <select id="findVisibleById" resultMap="MemoryEntityMap">
-    SELECT m.id, m.user_id, m.category, m.memory_text, m.strength, m.archived, m.embedding_json, m.updated_at
+    SELECT m.id, m.user_id, m.category, m.memory_text, m.strength, m.archived, m.chat_context_scope, m.embedding_json, m.updated_at
     FROM memories m
     WHERE m.id = #{id} AND m.user_id = #{userId}
       AND (NOT EXISTS (SELECT 1 FROM memory_sources s WHERE s.memory_id=m.id)
@@ -42,7 +43,7 @@
   </select>
 
   <select id="listByUserId" resultMap="MemoryEntityMap">
-    SELECT m.id, m.user_id, m.category, m.memory_text, m.strength, m.archived, m.embedding_json, m.updated_at
+    SELECT m.id, m.user_id, m.category, m.memory_text, m.strength, m.archived, m.chat_context_scope, m.embedding_json, m.updated_at
     FROM memories m
     WHERE m.user_id = #{userId}
     <if test="!includeArchived">
@@ -54,76 +55,71 @@
   </select>
 
   <select id="listConfirmedForAgent" resultMap="MemoryEntityMap">
-    SELECT m.id, m.user_id, m.category, m.memory_text, m.strength, m.archived, m.embedding_json, m.updated_at
+    SELECT m.id, m.user_id, m.category, m.memory_text, m.strength, m.archived, m.chat_context_scope, m.embedding_json, m.updated_at
     FROM memories m
-    WHERE m.user_id = #{userId} AND m.archived = 0
+    WHERE m.user_id = #{userId} AND m.archived = 0 AND m.chat_context_scope = 'chat_and_timeline'
       AND <include refid="LiveSource"/>
     ORDER BY m.strength DESC, m.updated_at DESC
     LIMIT #{limit}
   </select>
 
   <select id="findConfirmedById" resultMap="MemoryEntityMap">
-    SELECT m.id, m.user_id, m.category, m.memory_text, m.strength, m.archived, m.embedding_json, m.updated_at
+    SELECT m.id, m.user_id, m.category, m.memory_text, m.strength, m.archived, m.chat_context_scope, m.embedding_json, m.updated_at
     FROM memories m
     WHERE m.id = #{id} AND m.user_id = #{userId} AND m.archived = 0
+      AND m.chat_context_scope = 'chat_and_timeline'
       AND <include refid="LiveSource"/>
     LIMIT 1
   </select>
 
   <insert id="insert">
     INSERT INTO memories (
-      id, user_id, category, memory_text, strength, archived, embedding_json, updated_at
+      id, user_id, category, memory_text, strength, archived, chat_context_scope, embedding_json, updated_at
     ) VALUES (
-      #{id}, #{userId}, #{category}, #{memoryText}, #{strength}, #{archived}, #{embeddingJson}, #{updatedAt}
+      #{id}, #{userId}, #{category}, #{memoryText}, #{strength}, #{archived}, #{chatContextScope}, #{embeddingJson}, #{updatedAt}
     )
   </insert>
 
+  <update id="updateChatContextScope">
+    UPDATE memories SET chat_context_scope=#{scope}, updated_at=#{updatedAt}
+    WHERE id=#{id} AND user_id=#{userId}
+  </update>
+  <update id="updateChatContextScopeIfCurrent">
+    UPDATE memories SET chat_context_scope=#{scope}, updated_at=#{updatedAt}
+    WHERE id=#{id} AND user_id=#{userId} AND updated_at=#{expectedUpdatedAt}
+  </update>
+
   <update id="update">
     UPDATE memories
-    SET category = #{category},
-        memory_text = #{memoryText},
-        strength = #{strength},
-        archived = #{archived},
-        embedding_json = #{embeddingJson},
-        updated_at = #{updatedAt}
+    SET category = #{category}, memory_text = #{memoryText}, strength = #{strength}, archived = #{archived},
+        chat_context_scope = #{chatContextScope}, embedding_json = #{embeddingJson}, updated_at = #{updatedAt}
     WHERE id = #{id}
   </update>
 
   <update id="updateEmbeddingIfConfirmed">
     UPDATE memories m SET m.embedding_json=#{embeddingJson}, m.updated_at=#{updatedAt}
-    WHERE m.id=#{id} AND m.user_id=#{userId} AND m.archived=0
+    WHERE m.id=#{id} AND m.user_id=#{userId} AND m.archived=0 AND m.chat_context_scope='chat_and_timeline'
       AND m.memory_text=#{expectedText} AND m.updated_at=#{expectedUpdatedAt}
-      AND (m.embedding_json IS NULL OR m.embedding_json='')
-      AND <include refid="LiveSource"/>
+      AND (m.embedding_json IS NULL OR m.embedding_json='') AND <include refid="LiveSource"/>
   </update>
 
   <delete id="deleteById">
-    DELETE FROM memories
-    WHERE id = #{id} AND user_id = #{userId}
+    DELETE FROM memories WHERE id = #{id} AND user_id = #{userId}
   </delete>
 
   <select id="countWithEmbedding" resultType="int">
-    SELECT COUNT(*)
-    FROM memories
-    WHERE embedding_json IS NOT NULL AND embedding_json &lt;&gt; ''
+    SELECT COUNT(*) FROM memories WHERE embedding_json IS NOT NULL AND embedding_json &lt;&gt; ''
   </select>
 
-  <select id="countAll" resultType="int">
-    SELECT COUNT(*) FROM memories
-  </select>
+  <select id="countAll" resultType="int">SELECT COUNT(*) FROM memories</select>
 
   <select id="listPage" resultMap="MemoryEntityMap">
-    SELECT id, user_id, category, memory_text, strength, archived, embedding_json, updated_at
-    FROM memories
-    ORDER BY updated_at DESC, id ASC
-    LIMIT #{limit} OFFSET #{offset}
+    SELECT id, user_id, category, memory_text, strength, archived, chat_context_scope, embedding_json, updated_at
+    FROM memories ORDER BY updated_at DESC, id ASC LIMIT #{limit} OFFSET #{offset}
   </select>
 
   <select id="listPageByUserId" resultMap="MemoryEntityMap">
-    SELECT id, user_id, category, memory_text, strength, archived, embedding_json, updated_at
-    FROM memories
-    WHERE user_id = #{userId}
-    ORDER BY updated_at DESC, id ASC
-    LIMIT #{limit} OFFSET #{offset}
+    SELECT id, user_id, category, memory_text, strength, archived, chat_context_scope, embedding_json, updated_at
+    FROM memories WHERE user_id = #{userId} ORDER BY updated_at DESC, id ASC LIMIT #{limit} OFFSET #{offset}
   </select>
 </mapper>

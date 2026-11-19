@@ -9,6 +9,7 @@ public class MemoryEntity {
   private String memoryText;
   private int strength;
   private boolean archived;
+  private String chatContextScope = "chat_and_timeline";
   private String embeddingJson;
   private Instant updatedAt;
 
@@ -59,6 +60,9 @@ public class MemoryEntity {
   public void setArchived(boolean archived) {
     this.archived = archived;
   }
+
+  public String getChatContextScope() { return chatContextScope; }
+  public void setChatContextScope(String value) { chatContextScope = value; }
 
   public String getEmbeddingJson() {
     return embeddingJson;

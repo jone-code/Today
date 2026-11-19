@@ -20,6 +20,8 @@ public interface CheckinMapper {
 
   List<CheckinEntity> listRecentByUserId(
       @Param("userId") String userId, @Param("limit") int limit);
+  List<CheckinEntity> listByUserIdAndRange(@Param("userId") String userId,
+      @Param("from") LocalDate from, @Param("to") LocalDate to);
 
   int insert(CheckinEntity entity);
 

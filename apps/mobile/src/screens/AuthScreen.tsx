@@ -40,7 +40,7 @@ export function AuthScreen({ onAuthenticated, initialServer = "", initialEmail =
   }
 
   return <SafeAreaView style={styles.root}>
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.panel}>
           <Avatar size={68} />
@@ -70,8 +70,10 @@ export function AuthScreen({ onAuthenticated, initialServer = "", initialEmail =
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   scroll: { flexGrow: 1, justifyContent: "center", alignItems: "center", padding: layout.gutter },
-  panel: { width: "100%", maxWidth: 430, paddingVertical: 36, alignItems: "flex-start" },
-  title: { fontSize: 37, lineHeight: 48, color: colors.ink, fontWeight: "700", marginTop: 18 },
-  subtitle: { color: colors.muted, fontSize: 16, marginTop: 4 },
-  form: { marginTop: 36, width: "100%", gap: 4 },
+  panel: { width: "100%", maxWidth: 430, padding: 24, alignItems: "flex-start", backgroundColor: colors.surface,
+    borderRadius: 28, borderWidth: 1, borderColor: colors.line, shadowColor: colors.ink, shadowOpacity: 0.08,
+    shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 3 },
+  title: { fontSize: 39, lineHeight: 47, color: colors.ink, fontWeight: "800", letterSpacing: -1.2, marginTop: 18 },
+  subtitle: { color: colors.primary, fontSize: 16, marginTop: 5, fontWeight: "700" },
+  form: { marginTop: 30, width: "100%", gap: 4 },
 });

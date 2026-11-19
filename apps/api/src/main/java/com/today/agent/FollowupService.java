@@ -5,6 +5,7 @@ import com.today.identity.IdentityService;
 import com.today.persistence.FollowupPreferenceEntity;
 import com.today.persistence.FollowupTopicEntity;
 import com.today.persistence.InboxItemEntity;
+import com.today.privacy.PrivacySettingsService;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -23,9 +24,11 @@ public class FollowupService {
   private final FollowupMapper mapper;
   private final IdentityService identity;
   private final AppointmentMapper appointments;
+  private final PrivacySettingsService privacy;
 
-  public FollowupService(FollowupMapper mapper, IdentityService identity, AppointmentMapper appointments) {
-    this.mapper = mapper; this.identity = identity; this.appointments = appointments;
+  public FollowupService(FollowupMapper mapper, IdentityService identity, AppointmentMapper appointments,
+      PrivacySettingsService privacy) {
+    this.mapper = mapper; this.identity = identity; this.appointments = appointments; this.privacy = privacy;
   }
 
   @Transactional
@@ -102,12 +105,18 @@ public class FollowupService {
 
   @Transactional
   public FollowupPreferenceDto preferences() {
-    return preferenceDto(preference(identity.getCurrentUserId()));
+    String userId = identity.getCurrentUserId();
+    privacy.requireWritableAccount(userId);
+    return preferenceDto(preference(userId));
   }
 
   @Transactional
   public FollowupPreferenceDto updatePreferences(FollowupPreferenceUpdateRequest input) {
-    FollowupPreferenceEntity pref = preference(identity.getCurrentUserId());
+    String userId = identity.getCurrentUserId();
+    privacy.requireWritableAccount(userId);
+    // Acquire the privacy row first when changing authorization; the privacy endpoint uses the same order.
+    if (input.enabled() != null) privacy.syncFollowupEnabled(userId, input.enabled());
+    FollowupPreferenceEntity pref = preference(userId);
     if (input.enabled() != null) pref.setEnabled(input.enabled());
     if (input.maxPerDay() != null) pref.setMaxPerDay(input.maxPerDay());
     if (input.maxPerWeek() != null) pref.setMaxPerWeek(input.maxPerWeek());

@@ -9,6 +9,9 @@ import com.today.vector.VectorStore;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -20,18 +23,21 @@ public class HealthController {
   private final VectorStore vectorStore;
   private final VectorReindexService vectorReindex;
   private final LocalMediaStorage mediaStorage;
+  private final JdbcTemplate db;
 
   public HealthController(
       AiGatewayService aiGateway,
       AiCallObserver aiCallObserver,
       VectorStore vectorStore,
       VectorReindexService vectorReindex,
-      LocalMediaStorage mediaStorage) {
+      LocalMediaStorage mediaStorage,
+      JdbcTemplate db) {
     this.aiGateway = aiGateway;
     this.aiCallObserver = aiCallObserver;
     this.vectorStore = vectorStore;
     this.vectorReindex = vectorReindex;
     this.mediaStorage = mediaStorage;
+    this.db = db;
   }
 
   /** Liveness for Docker healthcheck — no DB / vector calls. */
@@ -41,6 +47,32 @@ public class HealthController {
     body.put("ok", true);
     body.put("service", "today-api");
     return body;
+  }
+
+  /** Readiness for traffic routing — verifies the database and configured vector store. */
+  @GetMapping("/health/ready")
+  public ResponseEntity<Map<String, Object>> ready() {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("service", "today-api");
+    boolean databaseOk = true;
+    try {
+      db.queryForObject("SELECT 1", Integer.class);
+    } catch (Exception e) {
+      databaseOk = false;
+      body.put("databaseDetail", e.getClass().getSimpleName());
+    }
+    body.put("database", databaseOk);
+    boolean vectorOk = true;
+    try {
+      vectorOk = vectorReindex.health().ok();
+    } catch (Exception e) {
+      vectorOk = false;
+      body.put("vectorDetail", e.getClass().getSimpleName());
+    }
+    body.put("vector", vectorOk);
+    boolean ready = databaseOk && vectorOk;
+    body.put("ok", ready);
+    return ResponseEntity.status(ready ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE).body(body);
   }
 
   @GetMapping("/health")

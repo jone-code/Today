@@ -28,6 +28,7 @@ export type MemoryItem = {
   category: "work" | "health" | "learning" | "life" | "emotion" | "goal";
   strength: number;
   archived: boolean;
+  chatContextScope?: "chat_and_timeline" | "timeline_only" | "disabled";
   updatedAt: string;
 };
 

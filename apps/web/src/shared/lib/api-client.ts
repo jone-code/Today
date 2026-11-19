@@ -1,5 +1,13 @@
 "use client";
 
+import {
+  MemoryAccessAuditSchema,
+  MemoryDtoSchema,
+  MemoryOriginSchema,
+  ProductEventSchema,
+  type ProductEvent,
+} from "@today/contracts";
+
 type ApiError = {
   statusCode?: number;
   message?: string;
@@ -9,6 +17,7 @@ type ApiError = {
 // Avoids browser → :3001 cross-origin resets when using Compose / LAN IP.
 const DEFAULT_API_BASE_URL = "/api";
 const TOKEN_KEY = "today.auth.token.v1";
+const WEB_APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || "0.1.0";
 
 export function getApiBaseUrl() {
   const v = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -115,7 +124,23 @@ export type MemoryDto = {
   text: string;
   strength: number;
   archived: boolean;
+  chatContextScope: "chat_and_timeline" | "timeline_only" | "disabled";
   updatedAt: string;
+};
+
+export type MemoryOriginDto = {
+  kind: "checkin" | "conversation";
+  sourceId: string;
+  date: string | null;
+  conversationId: string | null;
+};
+
+export type MemoryAccessAuditDto = {
+  id: string;
+  memoryId: string;
+  action: string;
+  source: string;
+  occurredAt: string;
 };
 
 export type ProactivePromptDto = {
@@ -194,6 +219,17 @@ export async function apiMe(): Promise<UserDto> {
   return requestJson("/v1/auth/me");
 }
 
+export async function apiTrack(events: ProductEvent[]): Promise<void> {
+  const normalized = events.map((event) => ProductEventSchema.parse({
+    ...event,
+    platform: event.platform ?? "web",
+    appVersion: event.appVersion ?? WEB_APP_VERSION,
+    eventSchemaVersion: event.eventSchemaVersion ?? 1,
+    occurredAt: event.occurredAt ?? new Date().toISOString(),
+  }));
+  await requestJson("/v1/events", { method: "POST", body: JSON.stringify(normalized) });
+}
+
 export type CheckinAiJobDto = {
   id: string;
   checkinId: string;
@@ -215,7 +251,7 @@ export async function apiGetSummaryByDate(date: string): Promise<DaySummaryDto> 
   return requestJson(`/v1/summaries/${encodeURIComponent(date)}`);
 }
 
-export async function apiPostCheckin(rawText: string): Promise<{
+export async function apiPostCheckin(rawText: string, requestId?: string): Promise<{
   checkin: CheckinDto;
   summary: DaySummaryDto | null;
   status: "processing" | "ready" | "failed";
@@ -223,6 +259,7 @@ export async function apiPostCheckin(rawText: string): Promise<{
 }> {
   return requestJson("/v1/checkins", {
     method: "POST",
+    headers: requestId ? { "Idempotency-Key": requestId } : undefined,
     body: JSON.stringify({ rawText }),
   });
 }
@@ -300,6 +337,28 @@ export async function apiUpdateMemory(
     method: "PUT",
     body: JSON.stringify(input),
   });
+}
+
+export async function apiUpdateMemoryContextScope(
+  id: string,
+  scope: NonNullable<MemoryDto["chatContextScope"]>,
+  expectedUpdatedAt?: string,
+): Promise<MemoryDto> {
+  const value = await requestJson(`/v1/memories/${encodeURIComponent(id)}/context-scope`, {
+    method: "PATCH",
+    body: JSON.stringify({ scope, expectedUpdatedAt }),
+  });
+  return MemoryDtoSchema.parse(value);
+}
+
+export async function apiGetMemoryOrigins(id: string): Promise<MemoryOriginDto[]> {
+  const value = await requestJson(`/v1/memories/${encodeURIComponent(id)}/origins`);
+  return MemoryOriginSchema.array().parse(value);
+}
+
+export async function apiGetMemoryAccessAudit(id: string): Promise<MemoryAccessAuditDto[]> {
+  const value = await requestJson(`/v1/memories/${encodeURIComponent(id)}/access-audit`);
+  return MemoryAccessAuditSchema.array().parse(value);
 }
 
 export async function apiArchiveMemory(id: string): Promise<MemoryDto> {

@@ -25,6 +25,12 @@ public interface MemoryMapper {
 
   int update(MemoryEntity entity);
 
+  int updateChatContextScope(@Param("id") String id, @Param("userId") String userId,
+      @Param("scope") String scope, @Param("updatedAt") Instant updatedAt);
+  int updateChatContextScopeIfCurrent(@Param("id") String id, @Param("userId") String userId,
+      @Param("scope") String scope, @Param("updatedAt") Instant updatedAt,
+      @Param("expectedUpdatedAt") Instant expectedUpdatedAt);
+
   int updateEmbeddingIfConfirmed(@Param("id") String id, @Param("userId") String userId,
       @Param("expectedText") String expectedText, @Param("expectedUpdatedAt") Instant expectedUpdatedAt,
       @Param("embeddingJson") String embeddingJson, @Param("updatedAt") Instant updatedAt);

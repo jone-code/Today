@@ -14,6 +14,7 @@ import com.today.identity.IdentityService;
 import com.today.persistence.FollowupPreferenceEntity;
 import com.today.persistence.FollowupTopicEntity;
 import com.today.persistence.InboxItemEntity;
+import com.today.privacy.PrivacySettingsService;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -24,7 +25,8 @@ import org.springframework.web.server.ResponseStatusException;
 class FollowupServiceTest {
   private final FollowupMapper mapper = mock(FollowupMapper.class);
   private final IdentityService identity = mock(IdentityService.class);
-  private final FollowupService service = new FollowupService(mapper, identity, mock(AppointmentMapper.class));
+  private final PrivacySettingsService privacy = mock(PrivacySettingsService.class);
+  private final FollowupService service = new FollowupService(mapper, identity, mock(AppointmentMapper.class), privacy);
 
   @Test
   void unreadCountWakesDueSnoozesForTheCurrentAccount() {
@@ -259,6 +261,19 @@ class FollowupServiceTest {
     assertEquals(false, updated.enabled());
     assertEquals(2, updated.maxPerWeek());
     verify(mapper).updatePreference(pref);
+    org.mockito.Mockito.verify(privacy).syncFollowupEnabled("u1", false);
+  }
+
+  @Test
+  void privacyAuthorizationConflictPreventsFollowupWrite() {
+    when(identity.getCurrentUserId()).thenReturn("u1");
+    org.mockito.Mockito.doThrow(new ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT))
+        .when(privacy).syncFollowupEnabled("u1", false);
+
+    assertThrows(ResponseStatusException.class,
+        () -> service.updatePreferences(new FollowupPreferenceUpdateRequest(false, 1, 3, "Asia/Shanghai")));
+    org.mockito.Mockito.verify(mapper, never()).lockPreference(any());
+    org.mockito.Mockito.verify(mapper, never()).updatePreference(any());
   }
 
   private static FollowupTopicEntity dueTopic(Instant now) {

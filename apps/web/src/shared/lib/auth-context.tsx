@@ -13,6 +13,7 @@ import {
   apiLogin,
   apiMe,
   apiRegister,
+  apiTrack,
   getAuthToken,
   setAuthToken,
   type UserDto,
@@ -73,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthToken(res.token);
     setToken(res.token);
     setUser(res.user);
+    void apiTrack([{ eventName: "auth_completed", screen: "Auth", entityType: "session" }]).catch(() => {});
   }, []);
 
   const register = useCallback(
@@ -81,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthToken(res.token);
       setToken(res.token);
       setUser(res.user);
+    void apiTrack([{ eventName: "auth_completed", screen: "Auth", entityType: "session" }]).catch(() => {});
     },
     [],
   );

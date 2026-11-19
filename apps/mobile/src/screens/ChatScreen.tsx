@@ -10,7 +10,8 @@ import { ApiRequestError } from "../api";
 import { appendOlderMessages, mergeConversationHistory } from "../chatHistory";
 import { readChatDraft, writeChatDraft } from "../chatDraft";
 import { conversationDataNotice, followupDataNotice } from "../dataNotice";
-import { useSession, type RootStackParams } from "../App";
+import { useSession } from "../session";
+import type { RootStackParams } from "../navigation";
 import { deleteSecureDraft } from "../secureDraft";
 import { colors, layout } from "../theme";
 import { Action, Avatar, Empty, IconAction, Notice, messageOf } from "../ui";
@@ -37,6 +38,7 @@ export function ChatScreen() {
   const [error, setError] = useState("");
   const [actionFeedback, setActionFeedback] = useState("");
   const [proposalBusy, setProposalBusy] = useState<string | null>(null);
+  const proposalViews = useRef(new Set<string>());
   const [introReady, setIntroReady] = useState(false);
   const [introSeen, setIntroSeen] = useState(false);
   const [introBusy, setIntroBusy] = useState(false);
@@ -60,9 +62,22 @@ export function ChatScreen() {
   const introKey = `today-chat-intro-v1-${storageScope}`;
 
   useEffect(() => {
+    const unseen = proposals.filter(proposal => proposal.status === "pending" && !proposalViews.current.has(proposal.id));
+    if (!unseen.length) return;
+    unseen.forEach(proposal => proposalViews.current.add(proposal.id));
+    void api.track(unseen.map(proposal => ({
+      eventName: "proposal_viewed",
+      screen: "Chat",
+      entityType: "proposal",
+      entityId: proposal.id,
+      propertiesJson: JSON.stringify({ kind: proposal.kind }),
+    }))).catch(() => {});
+  }, [api, proposals]);
+
+  useEffect(() => {
     setDraftReady(false); setDraftError(false); setDraftErrorMessage("");
     setDraft(""); setRetryId(null);
-    setCurrent(null); setProfile(null); setProposals([]);
+    setCurrent(null); setProfile(null); setProposals([]); proposalViews.current.clear();
     loadedConversationId.current = null;
   }, [draftKey]);
 
@@ -280,6 +295,7 @@ export function ChatScreen() {
     const id = retryId || randomUUID();
     setRetryId(id);
     let conversationId = current?.id;
+    const startedConversation = !current;
     try {
       await saveDraft(body, id, conversationId || null);
       setDraftError(false); setDraftErrorMessage("");
@@ -292,6 +308,10 @@ export function ChatScreen() {
       }
       await saveDraft(body, id, conversation.id);
       const result = await api.send(conversation.id, body, id);
+      void api.track([
+        ...(startedConversation ? [{ eventName: "conversation_started", screen: "Chat", entityType: "conversation", entityId: conversation.id }] : []),
+        { eventName: "message_sent", screen: "Chat", entityType: "conversation_message", entityId: id, clientRequestId: id },
+      ]).catch(() => {});
       const updated = await api.conversation(conversation.id);
       setCurrent(previous => mergeConversationHistory(previous, updated));
       setProposals(previous => [...previous, ...result.proposals.filter(p => p.status === "pending")]);
@@ -335,6 +355,8 @@ export function ChatScreen() {
     setProposalBusy(id);
     try {
       const updated = await api.proposal(id, action);
+      void api.track([{ eventName: action === "confirm" ? "proposal_confirmed" : "proposal_rejected",
+        screen: "Chat", entityType: "proposal", entityId: id }]).catch(() => {});
       setProposals(previous => previous.filter(p => p.id !== id));
       setActionFeedback(action === "reject" ? "已跳过这项建议" : ({
         checkin: "每日记录已保存", memory: "记忆已保存", followup: "后续关注已开启", todo: "待办已创建",
@@ -392,7 +414,7 @@ export function ChatScreen() {
   const failedMessage = current?.messages.find(message => message.role === "user" &&
     message.status === "failed" && (!draft.trim() || draft.trim() === message.body));
   const processing = current?.messages.some(message => message.status === "processing") || false;
-  return <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : undefined}
+  return <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : "height"}
     keyboardVerticalOffset={routeId ? 84 : 0}>
     <View style={styles.header}>
       <Avatar size={46} uri={profile?.avatarMediaId ? api.avatarUrl() + `?v=${profile.version}` : null} token={session.auth.token} />
@@ -475,13 +497,15 @@ function CheckinProposalCard({ proposal, busy, disabled, onPreview, onConfirm, o
   onPreview: (date: string, text?: string) => void; onConfirm: () => void; onReject: () => void;
 }) {
   const parsed = parseCheckinPreview(proposal.payloadJson);
+  const expired = !!proposal.expiresAt && Date.parse(proposal.expiresAt) <= Date.now();
+  const effectiveDisabled = disabled || expired;
   const preview = parsed ?? { date: "", source: "", previousText: "", text: "" };
   const [date, setDate] = useState(preview.date);
   const [text, setText] = useState(preview.text);
   useEffect(() => { setDate(preview.date); setText(preview.text); }, [proposal.payloadJson]);
   if (!parsed) return <View style={styles.proposal}>
     <Text style={styles.proposalTitle}>每日记录预览无法读取</Text>
-    <Action label="暂不保存" variant="quiet" onPress={onReject} disabled={disabled} />
+    <Action label="暂不保存" variant="quiet" onPress={onReject} disabled={effectiveDisabled} />
   </View>;
   const dateChanged = date !== preview.date;
   const changed = dateChanged || text !== preview.text;
@@ -504,10 +528,11 @@ function CheckinProposalCard({ proposal, busy, disabled, onPreview, onConfirm, o
     {dateChanged ? <Text style={styles.proposalExtra}>更新日期后，将重新合并那一天的记录。</Text> : null}
     <View style={styles.proposalActions}>
       {changed ? <Action label="更新预览" onPress={() => onPreview(date, dateChanged ? undefined : text)}
-        busy={busy} disabled={disabled || !validDate || (!dateChanged && !text.trim())} />
-        : <Action label="确认写入" onPress={onConfirm} busy={busy} disabled={disabled} />}
-      {!changed ? <Action label="重新获取预览" variant="quiet" onPress={() => onPreview(date)} disabled={disabled} /> : null}
-      <Action label="暂不保存" variant="quiet" onPress={onReject} disabled={disabled} />
+        busy={busy} disabled={effectiveDisabled || !validDate || (!dateChanged && !text.trim())} />
+        : <Action label="确认写入" onPress={onConfirm} busy={busy} disabled={effectiveDisabled} />}
+      {expired ? <Text style={styles.proposalExtra}>这项建议已过期，请重新发起整理。</Text> : null}
+      {!changed ? <Action label="重新获取预览" variant="quiet" onPress={() => onPreview(date)} disabled={effectiveDisabled} /> : null}
+      <Action label="暂不保存" variant="quiet" onPress={onReject} disabled={effectiveDisabled} />
     </View>
   </View>;
 }
@@ -527,6 +552,8 @@ function ProposalCard({ proposal, busy, disabled, onConfirm, onReject }: {
 }) {
   let detail = "来自这段对话的建议";
   let extra = "";
+  const expired = !!proposal.expiresAt && Date.parse(proposal.expiresAt) <= Date.now();
+  const effectiveDisabled = disabled || expired;
   try {
     const payload = JSON.parse(proposal.payloadJson) as {
       text?: string; reason?: string; title?: string; note?: string; dueDate?: string;
@@ -595,51 +622,52 @@ function ProposalCard({ proposal, busy, disabled, onConfirm, onReject }: {
     <Text style={styles.proposalTitle}>{titles[proposal.kind] || "确认这项建议？"}</Text>
     <Text style={styles.proposalDetail}>{detail}</Text>
     {extra ? <Text style={styles.proposalExtra}>{extra}</Text> : null}
+    {expired ? <Text style={styles.proposalExtra}>这项建议已过期，请重新发起请求。</Text> : null}
     <View style={styles.proposalActions}>
-      <Action label="确认执行" onPress={onConfirm} busy={busy} disabled={disabled} />
-      <Action label="暂不" variant="quiet" onPress={onReject} disabled={disabled} />
+      <Action label="确认执行" onPress={onConfirm} busy={busy} disabled={effectiveDisabled} />
+      <Action label="暂不" variant="quiet" onPress={onReject} disabled={effectiveDisabled} />
     </View>
   </View>;
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  header: { minHeight: 72, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", borderBottomWidth: 1, borderBottomColor: colors.line, backgroundColor: colors.surface },
+  header: { minHeight: 82, paddingHorizontal: 16, paddingTop: 8, flexDirection: "row", alignItems: "center", backgroundColor: colors.background },
   headerText: { flex: 1, minWidth: 60, marginLeft: 11 },
-  name: { color: colors.ink, fontSize: 16, fontWeight: "700" },
-  caption: { color: colors.muted, fontSize: 12, marginTop: 2 },
+  name: { color: colors.ink, fontSize: 17, fontWeight: "800", letterSpacing: -0.2 },
+  caption: { color: colors.primary, fontSize: 11, marginTop: 3, fontWeight: "700" },
   intro: { paddingHorizontal: layout.gutter, paddingVertical: 16, backgroundColor: colors.primarySoft,
-    borderBottomWidth: 1, borderBottomColor: colors.line, gap: 10 },
-  introTitle: { color: colors.ink, fontSize: 16, fontWeight: "700" },
+    borderRadius: 18, marginHorizontal: layout.gutter, gap: 10 },
+  introTitle: { color: colors.ink, fontSize: 16, fontWeight: "800" },
   introBody: { color: colors.ink, fontSize: 14, lineHeight: 22 },
   messages: { flex: 1 }, messageContent: { paddingHorizontal: layout.gutter, paddingVertical: 24, gap: 14, flexGrow: 1, width: "100%", maxWidth: 760, alignSelf: "center" },
   uprightEmpty: { transform: [{ rotate: "180deg" }] },
   trailing: { gap: 14 }, olderMessages: { alignItems: "center", gap: 8, paddingVertical: 12 },
-  bubble: { maxWidth: "85%", borderRadius: 8, paddingHorizontal: 15, paddingVertical: 11 },
-  agentBubble: { backgroundColor: colors.surface, alignSelf: "flex-start", borderWidth: 1, borderColor: colors.line },
-  userBubble: { backgroundColor: colors.primary, alignSelf: "flex-end" },
+  bubble: { maxWidth: "85%", borderRadius: 18, paddingHorizontal: 15, paddingVertical: 12, shadowColor: colors.ink, shadowOpacity: 0.04, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 1 },
+  agentBubble: { backgroundColor: colors.surface, alignSelf: "flex-start", borderWidth: 1, borderColor: colors.line, borderBottomLeftRadius: 6 },
+  userBubble: { backgroundColor: colors.primaryDeep, alignSelf: "flex-end", borderBottomRightRadius: 6 },
   bubbleText: { fontSize: 16, lineHeight: 24, color: colors.ink }, userText: { color: colors.onPrimary },
-  userStatus: { color: colors.onPrimary, fontSize: 12, lineHeight: 18, marginTop: 5 },
+  userStatus: { color: colors.onPrimaryMuted, fontSize: 12, lineHeight: 18, marginTop: 5 },
   retryArea: { paddingHorizontal: layout.gutter, paddingVertical: 10, backgroundColor: colors.attentionSoft,
     flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
   retryText: { color: colors.ink, fontSize: 14, flexGrow: 1 },
   generating: { flexDirection: "row", gap: 10, alignItems: "center", padding: 12 },
-  proposal: { padding: 16, backgroundColor: colors.attentionSoft, borderRadius: 7, gap: 10, maxWidth: 480 },
-  proposalTitle: { color: colors.ink, fontSize: 15, fontWeight: "700" },
+  proposal: { padding: 17, backgroundColor: colors.lavenderSoft, borderRadius: 20, gap: 10, maxWidth: 480, borderWidth: 1, borderColor: "rgba(183,165,199,0.35)" },
+  proposalTitle: { color: colors.ink, fontSize: 15, fontWeight: "800" },
   proposalDetail: { color: colors.ink, fontSize: 15, lineHeight: 23 },
   proposalExtra: { color: colors.muted, fontSize: 14, lineHeight: 21 },
   proposalActions: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-  previewLabel: { color: colors.ink, fontSize: 14, fontWeight: "600" },
-  previewDate: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 7,
+  previewLabel: { color: colors.inkSoft, fontSize: 13, fontWeight: "700" },
+  previewDate: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 14,
     minHeight: 48, paddingHorizontal: 12, fontSize: 16, color: colors.ink },
-  previewText: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 7,
+  previewText: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 14,
     minHeight: 112, padding: 12, fontSize: 16, lineHeight: 24, color: colors.ink },
   previewError: { color: colors.danger, fontSize: 13, lineHeight: 19 },
   error: { paddingHorizontal: layout.gutter, paddingTop: 12 },
-  composer: { paddingHorizontal: layout.gutter, paddingTop: 10, paddingBottom: 12, backgroundColor: colors.surface,
-    borderTopColor: colors.line, borderTopWidth: 1, flexDirection: "row", gap: 10, alignItems: "flex-end" },
+  composer: { paddingHorizontal: layout.gutter, paddingTop: 10, paddingBottom: 14, backgroundColor: colors.background,
+    flexDirection: "row", gap: 10, alignItems: "flex-end" },
   messageInput: { flex: 1, minHeight: 48, maxHeight: 120, color: colors.ink, fontSize: 16, lineHeight: 23,
-    borderRadius: 7, paddingHorizontal: 14, paddingVertical: 11, backgroundColor: colors.input, textAlignVertical: "top" },
-  send: { width: 48, height: 48, borderRadius: 7, alignItems: "center", justifyContent: "center", backgroundColor: colors.primary },
+    borderRadius: 20, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.surface, textAlignVertical: "top" },
+  send: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center", backgroundColor: colors.primaryDeep },
   disabled: { opacity: 0.42 }, pressed: { opacity: 0.7 },
 });

@@ -48,6 +48,12 @@
     LIMIT #{limit}
   </select>
 
+  <select id="listByUserIdAndRange" resultMap="CheckinEntityMap">
+    SELECT id, user_id, checkin_date, raw_text, created_at, updated_at
+    FROM checkins WHERE user_id=#{userId} AND checkin_date &gt;= #{from} AND checkin_date &lt; #{to}
+    ORDER BY checkin_date ASC
+  </select>
+
   <insert id="insert">
     INSERT INTO checkins (
       id, user_id, checkin_date, raw_text, created_at, updated_at

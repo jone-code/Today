@@ -51,4 +51,12 @@ class FallbackVectorStoreTest {
         new MemoryVectorRecord("id", "u1", "work", "t", 1, false, new float[] {1f}));
     verify(primary).upsert(any());
   }
+  @Test
+  void accountCleanupMustObservePrimaryDeletionFailure() {
+    doThrow(new IllegalStateException("down")).when(primary).deleteStrict("private-memory");
+    FallbackVectorStore store = new FallbackVectorStore(primary, fallback);
+    org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> store.deleteStrict("private-memory"));
+    verify(primary).deleteStrict("private-memory");
+  }
+
 }

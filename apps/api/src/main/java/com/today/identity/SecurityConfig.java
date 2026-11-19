@@ -48,6 +48,9 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers(HttpMethod.POST, "/v1/auth/register", "/v1/auth/login")
                     .permitAll()
+                    // Metrics use their own independent admin token in MetricsController.
+                    .requestMatchers("/v1/admin/metrics/**")
+                    .permitAll()
                     .anyRequest()
                     .authenticated())
         .exceptionHandling(

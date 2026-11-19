@@ -19,9 +19,22 @@ bash scripts/deploy-docker.sh up
 bash scripts/deploy-docker.sh status
 bash scripts/deploy-docker.sh logs          # api + web
 bash scripts/deploy-docker.sh health
+# 部署后只读检查：存活、就绪、指标鉴权和脱敏响应
+TODAY_OPS_API_URL=http://127.0.0.1:3001 \
+TODAY_METRICS_ADMIN_TOKEN="$TODAY_METRICS_ADMIN_TOKEN" \
+npm run ops:check
 bash scripts/deploy-docker.sh down          # 停服务，保留数据卷
 bash scripts/deploy-docker.sh down -v       # 停服务并清空数据卷
 ```
+
+迁移或发布前先创建备份（备份包含用户数据，默认写入未纳入版本控制的 `backups/`）：
+
+```bash
+npm run db:backup
+# 可指定输出路径：npm run db:backup -- ./backups/pre-release.sql.gz
+```
+
+脚本默认优先备份运行中的 `today-mysql` 容器，否则使用本机 `mysqldump`。通过 `TODAY_BACKUP_CONTAINER` 显式指定容器时，该容器不可用会直接失败，不会退回本机数据库。脚本使用事务一致性快照并拒绝覆盖已有文件。临时文件从创建起权限为 0600，失败时自动清理，完整备份以不覆盖目标的方式原子发布。
 
 等价手工步骤：
 
@@ -49,7 +62,7 @@ npm run stack:up       # 等价 docker compose up -d --build
 ```bash
 docker compose logs api --tail=200
 docker compose ps
-curl -s http://127.0.0.1:3001/health/live
+curl -s http://127.0.0.1:3001/health/ready
 ```
 
 API 启动时会自动执行 classpath 里的 `schema.sql` + migrations（`today.schema.bootstrap=true`），补齐如 `checkin_ai_jobs` 等表。
@@ -65,7 +78,7 @@ docker compose up -d --build api
 |------|------|
 | MySQL Access denied / 连不上 | `.env` 密码与旧数据卷不一致：`docker compose down -v` 后 `npm run stack:up`（清空本地 DB） |
 | schema bootstrap 报 missing tables | `MYSQL_USER` 需有 DDL 权限；或用 root 跑 `db:init:docker` |
-| 健康检查超时 | 健康检查走 `/health/live`；重建镜像：`docker compose up -d --build api` |
+| 健康检查超时 | 容器健康检查走 `/health/ready`，会同时检查数据库和向量依赖；重建镜像：`docker compose up -d --build api` |
 | 端口占用 | 改 `API_PORT` / 停掉占用 3001 的进程 |
 
 | 服务 | 地址 |
@@ -127,9 +140,13 @@ npm run dev:web
 
 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) 在 `main` 的 push / PR 上运行：
 
-1. **API** — Java 17 + `mvn test`
-2. **Web** — `npm ci` → contracts typecheck → lint → `next build`
-3. **Docker** — Buildx 构建 api / web 镜像（不推送）
+1. **API** — Java 17 + MySQL 8.4 + `mvn test`，并验证备份恢复与产品事件 schema。
+2. **Lifecycle E2E** — 独立 MySQL 8.4 与 API 运行态，先验证三类管理员指标、维度筛选、脱敏和错误令牌拒绝，再使用临时白名单账号验证隐私版本冲突、导出幂等与单次下载、删除确认和凭据失效；失败时上传 API 日志。
+3. **Web** — contracts typecheck → lint → `next build`，再用 Chromium 执行指标看板和记忆权限 Playwright 回归。
+4. **Mobile** — Expo SDK 依赖、类型、41 项测试、Android/iOS bundle、EAS/native 权限和版本配置。
+5. **Mobile native** — macOS 原生 prebuild 与 CocoaPods 依赖解析。
+6. **Docker** — Buildx 构建 api / web 镜像（不推送）。
+7. **Release configuration** — 运行 `test:release-check` 配置矩阵，验证合法配置及弱密钥、非布尔开关、非 HTTPS 地址拒绝。
 
 本地等价：
 
@@ -142,6 +159,12 @@ npm run ci:web
 
 1. 更换 `TODAY_JWT_SECRET`；按需设置 admin token。
 2. 配置 `OPENAI_*`（生产建议真实模型）。
-3. `npm run stack:up` 后访问 `/health`（含 `ai` / `vector` 字段）。
+3. `npm run stack:up` 后访问 `/health`（含 `ai` / `vector` 字段）；流量接入和容器健康检查使用 `/health/ready`，只有数据库与向量依赖都正常时才返回 200。
 4. 跑冒烟：`npm run e2e:smoke`（需本机或已起的 API/Web）。
-5. 若切 Qdrant：对存量记忆执行 `vector:reindex`（见 `docs/vector-store.md`）。
+5. 设置 `TODAY_METRICS_ADMIN_TOKEN` 后运行 `npm run ops:check`，确认 `/health/ready`、三类聚合指标和错误令牌拒绝均通过；脚本只输出耗时和状态，不输出指标正文或令牌。
+   需要把失败率告警作为发布门槛时，再设置 `TODAY_OPS_FAIL_ON_WARNINGS=true`；默认只报告语音成功率低于 95% 或导出/删除失败率高于 5% 的告警，不会因当前未配置真实语音供应商而阻断检查。
+   指标事件会区分 `android`、`ios`、`web` 和应用版本；Web 构建可通过 `NEXT_PUBLIC_APP_VERSION` 指定版本，未设置时使用 `0.1.0`。
+6. 试用结束时设置 `TODAY_TRIAL_FROM`、`TODAY_TRIAL_TO` 和 `TODAY_TRIAL_REPORT_OUT`，运行 `npm run trial:report` 生成仅含聚合数据的决策报告；输出文件不会覆盖已有报告。
+   报告包含反馈数量、按类型的反馈用户数、事件平台/应用版本/schema version 分布和记录事实/客户端事件对账结果；可用 `npm run test:trial-report` 在本地验证报告结构。
+7. 若切 Qdrant：对存量记忆执行 `vector:reindex`（见 `docs/vector-store.md`）。
+8. 指标访问审计默认保留 180 天；如需调整，设置 `TODAY_METRICS_AUDIT_RETAIN_DAYS` 并重新运行 `npm run release:check`（允许范围 1～3650 天）。

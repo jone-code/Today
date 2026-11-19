@@ -19,6 +19,7 @@ import {
 import {
   apiPostCheckin,
   apiReprocessTodayCheckin,
+  apiTrack,
   apiWaitForSummary,
 } from "@/shared/lib/api-client";
 import { useAuth } from "@/shared/lib/auth-context";
@@ -81,13 +82,32 @@ export function TodayProvider({ children }: { children: ReactNode }) {
   const [loopPhase, setLoopPhase] = useState<CheckinLoopPhase>("idle");
   const [loopMessage, setLoopMessage] = useState<string | null>(null);
   const lastRawTextRef = useRef<string | null>(null);
+  const lastRequestIdRef = useRef<string | null>(null);
   const resumeStartedRef = useRef<string | null>(null);
+  const viewedSummaryRef = useRef<string | null>(null);
+  const viewedTodayRef = useRef<string | null>(null);
 
   const bundleQuery = useQuery({
     queryKey: todayKeys.bundle(),
     queryFn: fetchTodayBundle,
     enabled: authReady && !!token,
   });
+  const todayEntry = bundleQuery.data?.todayEntry;
+  const bundleReady = !!bundleQuery.data;
+
+  useEffect(() => {
+    const viewKey = token ? `${token}:${todayKey()}` : null;
+    if (!viewKey || !bundleReady || viewedTodayRef.current === viewKey) return;
+    viewedTodayRef.current = viewKey;
+    void apiTrack([{ eventName: "today_viewed", screen: "Today" }]).catch(() => {});
+  }, [token, bundleReady]);
+
+  useEffect(() => {
+    const entry = todayEntry;
+    if (!token || !entry?.summary || viewedSummaryRef.current === entry.id) return;
+    viewedSummaryRef.current = entry.id;
+    void apiTrack([{ eventName: "summary_viewed", screen: "Today", entityType: "summary", entityId: entry.id }]).catch(() => {});
+  }, [token, todayEntry]);
 
   const refreshToday = useCallback(async () => {
     if (!token) return;
@@ -146,12 +166,18 @@ export function TodayProvider({ children }: { children: ReactNode }) {
     mutationFn: async (rawText: string) => {
       const trimmed = rawText.trim();
       if (!trimmed) throw new Error("请先写一点今天的内容");
+      const requestId = lastRawTextRef.current === trimmed && lastRequestIdRef.current
+        ? lastRequestIdRef.current
+        : globalThis.crypto.randomUUID();
       lastRawTextRef.current = trimmed;
+      lastRequestIdRef.current = requestId;
 
       if (token) {
         setLoopPhase("submitting");
         setLoopMessage("正在留下今天…");
-        const res = await apiPostCheckin(trimmed);
+        void apiTrack([{ eventName: "checkin_started", screen: "Today", entityType: "checkin", clientRequestId: `${requestId}:started` }]).catch(() => {});
+        const res = await apiPostCheckin(trimmed, requestId);
+        void apiTrack([{ eventName: "checkin_saved", screen: "Today", entityType: "checkin", entityId: res.checkin.id, clientRequestId: `${requestId}:saved` }]).catch(() => {});
 
         if (res.status === "processing" || !res.summary) {
           const pending = mapCheckinDtoToDayEntry(res.checkin, null, res.aiJob);
@@ -164,12 +190,14 @@ export function TodayProvider({ children }: { children: ReactNode }) {
           resumeStartedRef.current = pending.id;
           await waitAndRefresh(res.checkin.date);
           const fresh = queryClient.getQueryData<TodayBundle>(todayKeys.bundle());
+          lastRequestIdRef.current = null;
           return fresh?.todayEntry ?? mapCheckinDtoToDayEntry(res.checkin, null, res.aiJob);
         }
 
         await refreshToday();
         setLoopPhase("idle");
         setLoopMessage(null);
+        lastRequestIdRef.current = null;
         return mapCheckinDtoToDayEntry(res.checkin, res.summary);
       }
 

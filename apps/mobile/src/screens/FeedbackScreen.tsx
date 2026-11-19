@@ -5,7 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { randomUUID } from "expo-crypto";
 import { Send, Trash2 } from "lucide-react-native";
 import type { Feedback, FeedbackCreateRequest } from "@today/contracts";
-import { useSession } from "../App";
+import { useSession } from "../session";
 import { ApiRequestError } from "../api";
 import { deleteFeedbackDraft, feedbackDraftKey, readFeedbackDraft,
   writeFeedbackDraft, type FeedbackDraft } from "../feedbackDraft";
@@ -172,18 +172,18 @@ export function FeedbackScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  title: { color: colors.ink, fontSize: 22, lineHeight: 30, fontWeight: "700", marginBottom: 8 },
+  title: { color: colors.ink, fontSize: 26, lineHeight: 32, fontWeight: "800", letterSpacing: -0.5, marginBottom: 8 },
   muted: { color: colors.muted, fontSize: 14, lineHeight: 21, marginBottom: 20 },
   label: { color: colors.ink, fontSize: 14, fontWeight: "600", marginBottom: 8 },
   row: { flexDirection: "row", gap: 8, flexWrap: "wrap", marginBottom: 18 },
-  segment: { flex: 1, minWidth: 100, minHeight: 48, alignItems: "center", justifyContent: "center",
-    borderWidth: 1, borderColor: colors.line, borderRadius: 7, backgroundColor: colors.surface },
-  selected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
-  segmentText: { color: colors.muted, fontSize: 15, fontWeight: "600" },
-  selectedText: { color: colors.primary },
+  segment: { flex: 1, minWidth: 100, minHeight: 46, alignItems: "center", justifyContent: "center",
+    borderWidth: 1, borderColor: colors.line, borderRadius: 999, backgroundColor: colors.surface },
+  selected: { borderColor: colors.primaryDeep, backgroundColor: colors.primaryDeep },
+  segmentText: { color: colors.muted, fontSize: 14, fontWeight: "700" },
+  selectedText: { color: colors.onPrimary },
   pressed: { opacity: 0.7 },
   sectionTitle: { color: colors.ink, fontSize: 18, fontWeight: "700", marginBottom: 12 },
-  item: { borderBottomColor: colors.line, borderBottomWidth: 1, paddingVertical: 12 },
+  item: { backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.line, padding: 14, marginBottom: 10 },
   itemHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   meta: { color: colors.muted, fontSize: 13, lineHeight: 20 },
   body: { color: colors.ink, fontSize: 15, lineHeight: 23, paddingBottom: 6 },
